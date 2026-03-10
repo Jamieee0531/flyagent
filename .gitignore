@@ -25,3 +25,8 @@ npm-debug.log*
 
 # Claude Code
 .claude/
+CLAUDE.md
+
+# Personal files
+papers/
+pics/
