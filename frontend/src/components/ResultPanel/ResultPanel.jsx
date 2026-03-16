@@ -1,6 +1,9 @@
 import './ResultPanel.css'
 
+// shows search results: flights, hotels, itinerary, and travel tips
+// each flight/hotel card has a save-to-favorites button
 function ResultPanel({ results, favorites, onToggleFavorite }) {
+  // check if an item is already in favorites
   const isFavorited = (id) => favorites.some(f => f.id === id)
 
   return (

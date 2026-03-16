@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './AgentPanel.css'
 
+// 2x2 grid of agent cards, shows what each agent is doing
+// click on an agent to expand its step-by-step progress
 function AgentPanel({ agents }) {
   const [expandedId, setExpandedId] = useState(null)
 
@@ -54,11 +56,13 @@ function AgentPanel({ agents }) {
   )
 }
 
+// map status key to display text
 function getStatusText(status) {
   const map = { idle: 'Idle', working: 'Searching...', done: 'Done', error: 'Error' }
   return map[status] || status
 }
 
+// map step status to an emoji icon
 function getStepIcon(status) {
   const map = { done: '✅', working: '🔄', pending: '⬜' }
   return map[status] || '⬜'

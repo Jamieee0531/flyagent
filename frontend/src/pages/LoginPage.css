@@ -152,3 +152,9 @@
   transform: translate(2px, 2px);
   box-shadow: none;
 }
+
+.form-error {
+  color: #c0392b;
+  font-size: 11px;
+  margin-top: 2px;
+}

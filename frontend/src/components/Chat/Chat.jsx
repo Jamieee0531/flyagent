@@ -5,6 +5,8 @@ const MOCK_MESSAGES = [
   { id: '1', role: 'agent', text: 'Hi there! Tell me about your trip — where to, when, and how many people?' },
 ]
 
+// chat area where user talks to the agent
+// after enough messages it triggers the agent search automatically
 function Chat({ phase, onStartAgents, onStopAgents, compressed }) {
   const [messages, setMessages] = useState(MOCK_MESSAGES)
   const [input, setInput] = useState('')
@@ -82,6 +84,7 @@ function Chat({ phase, onStartAgents, onStopAgents, compressed }) {
   )
 }
 
+// pick a canned reply based on how many messages have been sent
 function getAgentReply(msgCount) {
   const replies = [
     'Sounds great! Which city are you departing from?',

@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import './Sidebar.css'
 
+// sidebar with favorites, session history, and sign out
+// can be collapsed to save space
 function Sidebar({
   collapsed,
   onToggle,

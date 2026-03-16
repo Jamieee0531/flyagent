@@ -5,7 +5,8 @@ import AgentPanel from '../components/AgentPanel/AgentPanel.jsx'
 import ResultPanel from '../components/ResultPanel/ResultPanel.jsx'
 import './MainPage.css'
 
-// Session phases: 'chat' | 'executing' | 'result'
+// main page layout - sidebar on the left, chat + right panel in the middle
+// session goes through 3 phases: chat -> executing -> result
 const MOCK_SESSIONS = [
   { id: '1', title: 'Golden Week Tokyo Trip', date: '2025-05-01', phase: 'result' },
   { id: '2', title: 'Bangkok Weekend Getaway', date: '2025-04-20', phase: 'result' },
@@ -109,6 +110,7 @@ const MOCK_RESULTS = {
   ],
 }
 
+// manages session state and switches between chat/executing/result views
 function MainPage({ onLogout }) {
   const [sessions, setSessions] = useState(MOCK_SESSIONS)
   const [favorites, setFavorites] = useState(MOCK_FAVORITES)
@@ -143,6 +145,7 @@ function MainPage({ onLogout }) {
     setPhase('chat')
   }
 
+  // add or remove item from favorites list
   const handleToggleFavorite = (item) => {
     const exists = favorites.find(f => f.id === item.id)
     if (exists) {
