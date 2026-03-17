@@ -48,7 +48,7 @@ function LoginPage({ onLogin }) {
       <div className="login-card">
         <div className="login-logo">
           <span className="logo-icon">✈️</span>
-          <h1>TripAgent</h1>
+          <h1>Nomie</h1>
           <p className="login-subtitle">Your AI Travel Companion</p>
         </div>
 

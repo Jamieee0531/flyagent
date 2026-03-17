@@ -28,7 +28,7 @@ function Sidebar({
   return (
     <div className="sidebar">
       <div className="sidebar-header">
-        <span className="sidebar-logo">✈️ TripAgent</span>
+        <span className="sidebar-logo">✈️ Nomie</span>
         <button className="sidebar-toggle" onClick={onToggle}>✕</button>
       </div>
 

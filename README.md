@@ -1,4 +1,4 @@
-# TripAgent — AI Travel Planning Assistant
+# Nomie — AI Travel Planning Assistant
 
 An AI-powered web agent that helps users plan trips. Instead of manually searching across multiple travel websites, users describe their travel needs (destination, dates, number of people, budget) in a chat, and the agent automatically browses travel sites, compares prices, and returns organized results with recommendations.
 
@@ -14,7 +14,7 @@ Planning a trip usually means opening a bunch of tabs — Google Flights, Trip.c
 - Comparing across different sites with different layouts is mentally exhausting
 - By the time you finish comparing, prices might have already changed
 
-TripAgent aims to solve this by delegating the search and comparison work to AI agents that browse these sites on behalf of the user and return a curated summary. This problem will remain relevant as long as travel booking platforms exist, and is likely to grow in importance as AI agent technology matures over the next 5–10 years.
+Nomie aims to solve this by delegating the search and comparison work to AI agents that browse these sites on behalf of the user and return a curated summary. This problem will remain relevant as long as travel booking platforms exist, and is likely to grow in importance as AI agent technology matures over the next 5–10 years.
 
 ## Solution Architecture
 
@@ -52,7 +52,7 @@ No other external code was directly copied into this project.
 | **Google Flights** | Search tool | Clean UI, good filters | Only flights, no hotels/itinerary bundled |
 | **Gemini Deep Research** | AI general search | Can research any topic in depth | Not travel-specific, no structured comparison output |
 
-**TripAgent's differentiator**: It combines the comparison ability of meta-search engines with AI automation. Users don't need to search manually — they just describe what they want, and the agent does the rest. The output is structured (flights, hotels, itinerary, tips) rather than a generic text response.
+**Nomie's differentiator**: It combines the comparison ability of meta-search engines with AI automation. Users don't need to search manually — they just describe what they want, and the agent does the rest. The output is structured (flights, hotels, itinerary, tips) rather than a generic text response.
 
 ---
 
