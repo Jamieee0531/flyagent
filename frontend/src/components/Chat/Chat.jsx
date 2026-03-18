@@ -1,46 +1,21 @@
 import { useState } from 'react'
 import './Chat.css'
 
-const MOCK_MESSAGES = [
-  { id: '1', role: 'agent', text: 'Hi there! Tell me about your trip — where to, when, and how many people?' },
-]
-
 // chat area where user talks to the agent
-// after enough messages it triggers the agent search automatically
-function Chat({ phase, onStartAgents, onStopAgents, compressed }) {
-  const [messages, setMessages] = useState(MOCK_MESSAGES)
+// message data and send flow are controlled by parent state machine
+function Chat({ phase, onStopAgents, compressed, messages, isSending, onSendMessage }) {
   const [input, setInput] = useState('')
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  // pass user input to parent; parent decides how state transitions happen
+  const handleSend = async () => {
+    const text = input.trim()
+    if (!text || isSending) return
 
-    const userMsg = { id: Date.now().toString(), role: 'user', text: input }
-    const newMessages = [...messages, userMsg]
     setInput('')
-
-    // Simulate agent response
-    const agentReply = {
-      id: (Date.now() + 1).toString(),
-      role: 'agent',
-      text: getAgentReply(newMessages.length),
-    }
-    const withReply = [...newMessages, agentReply]
-    setMessages(withReply)
-
-    // After enough messages, simulate "ready to search"
-    if (newMessages.filter(m => m.role === 'user').length >= 3) {
-      setTimeout(() => {
-        const readyMsg = {
-          id: (Date.now() + 2).toString(),
-          role: 'agent',
-          text: 'Got it! Let me start searching for you now 🚀',
-        }
-        setMessages(prev => [...prev, readyMsg])
-        setTimeout(() => onStartAgents(), 1000)
-      }, 1500)
-    }
+    await onSendMessage(text)
   }
 
+  // send on Enter; Shift+Enter keeps newline in textarea
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
@@ -73,27 +48,16 @@ function Chat({ phase, onStartAgents, onStopAgents, compressed }) {
               onKeyDown={handleKeyDown}
               placeholder={compressed ? 'Message...' : 'Describe your travel plans... (Enter to send)'}
               rows={1}
+              disabled={isSending}
             />
-            <button className="send-btn" onClick={handleSend} disabled={!input.trim()}>
-              Send
+            <button className="send-btn" onClick={handleSend} disabled={!input.trim() || isSending}>
+              {isSending ? 'Sending...' : 'Send'}
             </button>
           </div>
         )}
       </div>
     </div>
   )
-}
-
-// pick a canned reply based on how many messages have been sent
-function getAgentReply(msgCount) {
-  const replies = [
-    'Sounds great! Which city are you departing from?',
-    'Got it! Any accommodation preferences — hotel or Airbnb? Budget range?',
-    'Nice! Any must-see attractions or activities in mind?',
-    'Almost there, let me confirm the details...',
-  ]
-  const idx = Math.min(Math.floor(msgCount / 2), replies.length - 1)
-  return replies[idx]
 }
 
 export default Chat
