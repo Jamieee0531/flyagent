@@ -23,44 +23,28 @@ def task_tool(
     runtime: ToolRuntime[ContextT, ThreadState],
     description: str,
     prompt: str,
-    subagent_type: Literal["general-purpose", "bash"],
+    subagent_type: Literal["flight-search", "hotel-search", "itinerary-planner", "travel-tips"],
     tool_call_id: Annotated[str, InjectedToolCallId],
     max_turns: int | None = None,
 ) -> str:
     """Delegate a task to a specialized subagent that runs in its own context.
 
-    Subagents help you:
-    - Preserve context by keeping exploration and implementation separate
-    - Handle complex multi-step tasks autonomously
-    - Execute commands or operations in isolated contexts
-
     Available subagent types:
-    - **general-purpose**: A capable agent for complex, multi-step tasks that require
-      both exploration and action. Use when the task requires complex reasoning,
-      multiple dependent steps, or would benefit from isolated context.
-    - **bash**: Command execution specialist for running bash commands. Use for
-      git operations, build processes, or when command output would be verbose.
-
-    When to use this tool:
-    - Complex tasks requiring multiple steps or tools
-    - Tasks that produce verbose output
-    - When you want to isolate context from the main conversation
-    - Parallel research or exploration tasks
-
-    When NOT to use this tool:
-    - Simple, single-step operations (use tools directly)
-    - Tasks requiring user interaction or clarification
+    - **flight-search**: Search and compare flights across multiple platforms.
+    - **hotel-search**: Search and compare hotels and accommodations.
+    - **itinerary-planner**: Generate a day-by-day travel itinerary.
+    - **travel-tips**: Provide practical travel tips and warnings.
 
     Args:
         description: A short (3-5 word) description of the task for logging/display. ALWAYS PROVIDE THIS PARAMETER FIRST.
-        prompt: The task description for the subagent. Be specific and clear about what needs to be done. ALWAYS PROVIDE THIS PARAMETER SECOND.
+        prompt: The task description for the subagent. Be specific about destination, dates, budget, and preferences. ALWAYS PROVIDE THIS PARAMETER SECOND.
         subagent_type: The type of subagent to use. ALWAYS PROVIDE THIS PARAMETER THIRD.
         max_turns: Optional maximum number of agent turns. Defaults to subagent's configured max.
     """
     # Get subagent configuration
     config = get_subagent_config(subagent_type)
     if config is None:
-        return f"Error: Unknown subagent type '{subagent_type}'. Available: general-purpose, bash"
+        return f"Error: Unknown subagent type '{subagent_type}'. Available: flight-search, hotel-search, itinerary-planner, travel-tips"
 
     # Build config overrides
     overrides: dict = {}
