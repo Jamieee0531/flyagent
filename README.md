@@ -5,6 +5,7 @@ An AI-powered web agent that helps users plan trips. Instead of manually searchi
 **Team**: 
 - KANG Jinyu (A0330139M)
 - LI Jingwen(A0328022R)
+- LI Zouran
 
 ---
 

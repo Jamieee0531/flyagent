@@ -1,4 +1,4 @@
-# TripAgent - AI 旅行规划 Agent
+# Nomie - AI 旅行规划 Agent
 
 ## 是什么
 
@@ -8,7 +8,7 @@
 
 > **小明想五一去日本玩**
 >
-> 1. 小明打开 TripAgent，登录账号，点击"新建旅行规划"
+> 1. 小明打开 Nomie，登录账号，点击"新建旅行规划"
 > 2. 聊天界面弹出，Agent 问："你好！请告诉我你的旅行计划～"
 > 3. 小明输入："我想五一假期去日本东京玩5天，两个人，预算1万左右"
 > 4. Agent 追问几个关键问题：
@@ -69,19 +69,17 @@
 ## 技术栈
 
 - 前端：React + JavaScript (JSX) + CSS (pixel art theme)
-- 后端：待定（Node.js/Express 或 Python/Flask 等，参考开源项目后决定）
-- 数据库：MongoDB
+- 后端/Agent：基于 DeerFlow（字节跳动开源 Agent 平台）适配，具体技术栈跟随 DeerFlow
 - 部署：Docker
-- 浏览器自动化：待定（参考开源 Deep Research 项目）
 
 > 技术栈可根据实际开发需要调整。
 
 ## 技术考量
 
-- **浏览器自动化能力**：Agent 需要能打开网页、读取内容、点击按钮、填写表单。这是支撑 Deep Research 和代操作功能的底层能力
+- **基于 DeerFlow 架构**：采用 DeerFlow 的 ReAct 循环 + Middleware + 子 Agent 编排模式，参考 `deer-flow/deerflow-study-notes.md`
 - **多 Agent 协作架构**：需要设计 sub-agent 的分工（机票搜索、酒店搜索、行程规划等）和协调机制
-- **实时状态推送**：Agent 工作状态需要实时推送到前端（WebSocket 或 SSE）
-- **Deep Research 实现**：将参考开源项目，具体方案待研究确定
+- **实时状态推送**：Agent 工作状态通过 SSE 流式推送到前端
+- **状态机驱动的前端**：对话页使用显式状态机管理 phase 切换（chat → executing → result），消息流和 Agent 执行由 MainPage 统一控制
 
 ## 备注
 
