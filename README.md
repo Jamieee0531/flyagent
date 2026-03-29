@@ -2,10 +2,10 @@
 
 An AI-powered web agent that helps users plan trips. Instead of manually searching across multiple travel websites, users describe their travel needs (destination, dates, number of people, budget) in a chat, and the agent automatically browses travel sites, compares prices, and returns organized results with recommendations.
 
-**Team**: 
+**Team**:
 - KANG Jinyu (A0330139M)
-- LI Jingwen(A0328022R)
-- LI Zouran
+- LI Jingwen (A0328022R)
+- LI Zouran (A0329022N)
 
 ---
 
