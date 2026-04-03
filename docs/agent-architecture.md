@@ -47,7 +47,21 @@
 <critical_reminders> 重要提醒
 ```
 
-具体 prompt 内容待设计。
+### System Prompt Modules (finalized)
+
+| Module | Source | Content |
+|--------|--------|---------|
+| `<role>` | Custom | Nomie, cute friendly travel planning assistant |
+| `<soul>` | DeerFlow (optional) | Agent personality via SOUL.md |
+| `<memory>` | DeerFlow (unchanged) | Long-term memory injection |
+| `<thinking_style>` | DeerFlow + travel additions | Collect destination, origin, dates, travelers before proceeding |
+| `<clarification_system>` | DeerFlow + travel examples | Travel-specific missing_info and ambiguous_requirement examples |
+| `<skill_system>` | DeerFlow (unchanged) | Skills loaded from skills/ directory |
+| `<subagent_system>` | Custom | Fixed 4 travel sub-agents, dispatch all on user confirmation |
+| `<working_directory>` | DeerFlow (unchanged) | Upload/workspace/output paths |
+| `<response_style>` | Custom | Friendly, warm, occasional soft expressions (呀/哦/啦) |
+| `<citations>` | DeerFlow (unchanged) | Markdown link citation format |
+| `<critical_reminders>` | DeerFlow + travel additions | Must collect minimum info, user confirmation required |
 
 ### Middleware
 
@@ -116,6 +130,16 @@ Sub-agent 返回自然语言文本，Lead Agent 自行汇总。
 ```
 
 去掉的部分：memory（短期任务不需要）、clarification_system（不能问用户）、subagent_system（不能派子任务）。
+
+### Sub-agent Prompt Structure (all 4 share this structure)
+
+Each sub-agent prompt contains only:
+- `<role>` — specialist identity + "work autonomously, do NOT ask for clarification"
+- `<thinking_style>` — search/analysis strategy specific to this agent's domain
+- `<output_format>` — exact fields to return
+- `<citations>` — cite data sources
+
+Modules NOT included in sub-agents: memory, clarification_system, subagent_system, response_style, working_directory, skill_system
 
 ### Sub-agent Middleware
 
