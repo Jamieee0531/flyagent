@@ -3,45 +3,48 @@
 > **Author:** (Your Name / Matric Number)  
 > **Component:** `gateway/` — Access Layer  
 > **Date:** April 2026  
-> **Course:** IT5007 · Software Engineering on Application Architecture
+> **Course:** IT5007 · Software Engineering on Application Architecture  
+> **Version:** v2.0 — Revised architecture after team alignment on 3 Apr 2026
 
 ---
 
 ## 1. Component Overview
 
-The **API Gateway** (`gateway/`) is the central access layer between the React frontend and the Python-based Agent Orchestrator. It is responsible for all user-facing REST endpoints, authentication lifecycle, MongoDB persistence, and real-time Server-Sent Events (SSE) bridging.
+The **API Gateway** (`gateway/`) is the user identity and data persistence layer. Following team alignment on the overall system architecture, the Gateway's scope has been **deliberately focused** on two core responsibilities:
+
+1. **User Authentication** — registration, login, JWT lifecycle
+2. **Favorites Persistence** — saving and retrieving result cards chosen by the user
+
+All real-time chat communication, SSE streaming, agent orchestration, and session/history management are handled natively by the **LangGraph Server** (Python side), which the frontend connects to directly.
 
 ### Position in System Architecture
 
 ```
-┌────────────────────────────────────────────────────────┐
-│   Frontend (React + Vite :3000)                        │
-│   Auth pages · Chat UI · Agent Panel · Result Cards    │
-└──────────────────┬─────────────────────────────────────┘
-                   │ HTTP / SSE
-┌──────────────────▼─────────────────────────────────────┐
-│   API Gateway (Node.js + Express :8080)  ← YOU ARE HERE│
-│   JWT Auth · Session CRUD · SSE Bridge · Rate Limiting │
-└──────────┬──────────────────────┬───────────────────────┘
-           │ Mongoose ODM         │ Internal HTTP
-           ▼                      ▼
-┌─────────────────┐    ┌──────────────────────────────────┐
-│  MongoDB :27017 │    │  Agent Orchestrator (Python :8081)│
-│  users          │    │  LangGraph · FlightAgent          │
-│  sessions       │    │  HotelAgent · ItineraryAgent      │
-│  messages       │    │  TipsAgent · SSE event emitter    │
-│  result_cards   │    └──────────┬───────────────────────┘
-│  favorites      │               │ 3rd-party APIs
-│  agent_events   │    ┌──────────▼───────────────────────┐
-└─────────────────┘    │  Google Flights · Booking.com     │
-                       │  OpenAI API · Weather API, etc.   │
-                       └──────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│   Frontend (React + Vite :3000)                               │
+└────────────┬───────────────────────────┬──────────────────────┘
+             │ REST (Auth + Favorites)   │ SSE / Chat (direct)
+             ▼                           ▼
+┌────────────────────────┐   ┌───────────────────────────────────┐
+│  API Gateway           │   │  LangGraph Server (Python)        │
+│  Node.js + Express     │   │  DeerFlow-based agent harness     │
+│  :8080                 │   │  :2024                            │
+│                        │   │                                   │
+│  POST /api/auth/*      │   │  Chat threads & SSE streams       │
+│  GET|POST|DELETE       │   │  Flight / Hotel / Itinerary /     │
+│    /api/favorites      │   │  Tips agents                      │
+│                        │   │  LangGraph Checkpointer           │
+│  MongoDB (users,       │   │  (long-term session memory)       │
+│           favorites)   │   └───────────────────────────────────┘
+└────────────────────────┘
+         │
+         ▼
+  MongoDB :27017
+  ├── users
+  └── favorites
 ```
 
-**Why this architecture satisfies the Rubrics (Back-end Implementation):**
-- Routing through **multiple back-end technology layers** (Express → Python Orchestrator → 3rd-party APIs) is the specific criterion that distinguishes A-grade from B-grade submissions.
-- Self-managed **authentication database** using MongoDB + bcrypt.
-- **SSE real-time communication** as a Novel Back-end Feature.
+> **Architectural rationale:** The two services are **fully decoupled** — they do not call each other at runtime. The Gateway does not proxy, bridge, or translate any LangGraph traffic. This mirrors the DeerFlow 2.0 philosophy of separating the management/auth plane (FastAPI Gateway) from the agent runtime (LangGraph Server).
 
 ---
 
@@ -49,19 +52,20 @@ The **API Gateway** (`gateway/`) is the central access layer between the React f
 
 > **Decision (confirmed):** The Gateway is implemented in **plain JavaScript (CommonJS)**. TypeScript is not adopted to stay consistent with the existing JSX frontend, reduce configuration overhead, and prioritise delivery speed. Runtime validation is handled by `zod` instead.
 
-| Category  | Technology | Rationale |
-|-----------|-----------|
-| Runtime | Node.js 20 LTS | Matches frontend ecosystem; strong async I/O for SSE |
-| Language | JavaScript (ES2022, CommonJS) | Consistent with frontend; no TS compiler step needed |
-| Framework | Express 4 | Lightweight, well-understood, minimal boilerplate |
-| ODM | Mongoose 8 | Schema-level validation; clean driver for MongoDB |
-| Database | MongoDB 7 | Semi-structured sessions, events, result cards |
-| Auth | `jsonwebtoken` + `bcryptjs` | Lightweight JWT; bcrypt for password hashing |
-| Validation | `zod` | Runtime DTO validation; replaces TS type safety |
-| HTTP Client | `axios` | Orchestrator service calls |
-| Logging | `morgan` + `winston` | Access log + structured error/audit log |
-| Dev tooling | `nodemon`, `dotenv` | Hot-reload in development |
+| Category | Technology | Rationale |
+|----------|-----------|-----------|
+| Runtime | Node.js 20 LTS | Lightweight, consistent with frontend ecosystem |
+| Language | JavaScript (ES2022, CommonJS) | Consistent with frontend; no TS compiler step |
+| Framework | Express 4 | Minimal boilerplate; easy to document for rubrics |
+| ODM | Mongoose 8 | Schema-level validation for `users` and `favorites` |
+| Database | MongoDB 7 | Stores user accounts and saved favorite cards |
+| Auth | `jsonwebtoken` + `bcryptjs` | JWT tokens; secure password hashing |
+| Validation | `zod` | Runtime DTO validation; satisfies Usability rubric |
+| Logging | `morgan` + `winston` | Access log + structured error reporting |
+| Dev tooling | `nodemon`, `dotenv` | Hot-reload; environment configuration |
 | Container | Docker | Part of global `docker-compose.yml` |
+
+> **Removed from original stack:** `axios` (no Orchestrator calls needed), `express-rate-limit` is still included as a lightweight security measure.
 
 ---
 
@@ -70,130 +74,76 @@ The **API Gateway** (`gateway/`) is the central access layer between the React f
 ```
 gateway/
 ├── src/
-│   ├── server.js              # Express app bootstrap, CORS, global error handler
+│   ├── server.js              # Express app bootstrap, CORS, error handler
 │   ├── routes/
 │   │   ├── auth.routes.js     # POST /api/auth/register|login|logout
-│   │   ├── session.routes.js  # CRUD for /api/sessions
-│   │   ├── message.routes.js  # POST /api/sessions/:id/messages
-│   │   ├── agent.routes.js    # /start, /stop, /events (SSE), /mock-events
-│   │   ├── favorite.routes.js # GET|POST|DELETE /api/favorites
-│   │   └── internal.routes.js # POST /internal/events (Orchestrator callback)
+│   │   └── favorite.routes.js # GET|POST|DELETE /api/favorites
 │   ├── controllers/
 │   │   ├── auth.controller.js
-│   │   ├── session.controller.js
-│   │   ├── message.controller.js
-│   │   ├── agent.controller.js
-│   │   ├── favorite.controller.js
-│   │   └── internal.controller.js # Receives events from Orchestrator
+│   │   └── favorite.controller.js
 │   ├── services/
-│   │   ├── auth.service.js         # Password hash/compare, token sign/verify
-│   │   ├── session.service.js      # Business logic for session lifecycle
-│   │   ├── orchestrator.service.js # HTTP bridge to Python Agent service
-│   │   └── sse.manager.js          # SSE connection Map & broadcast
+│   │   └── auth.service.js    # bcrypt hash/compare, JWT sign/verify
 │   ├── models/
-│   │   ├── User.js
-│   │   ├── Session.js
-│   │   ├── Message.js
-│   │   ├── ResultCard.js
-│   │   ├── Favorite.js
-│   │   └── AgentEvent.js
+│   │   ├── User.js            # ✅ Active
+│   │   └── Favorite.js        # ✅ Active (stores full card content)
 │   ├── middlewares/
 │   │   ├── auth.middleware.js      # JWT verification → req.user
 │   │   ├── validate.middleware.js  # Zod schema runner
 │   │   └── rateLimit.middleware.js # Per-IP rate limiting
 │   └── config/
-│       └── db.js                  # Mongoose connection
+│       └── db.js              # Mongoose connection
 ├── .env.example
 ├── Dockerfile
 └── package.json
 ```
 
-> **Note on `search_runs` collection:** The `search_runs` collection (raw search data per Architecture Doc §9) is managed entirely by the **Python Orchestrator** layer and is out of scope for the Gateway. The Gateway only reads aggregated `result_cards` written back by the Orchestrator via the internal callback. `search_runs` integration may be added in Phase 4+.
+> **Schemas created in Phase 1 but no longer active:** `Session.js`, `Message.js`, `ResultCard.js`, `AgentEvent.js`. These files remain in the repo for historical reference but are not used by any route. They will be cleaned up in the Phase 3 code tidy-up commit.
 
-**SE Criterion met:** Code Modularization — each concern (routing, business logic, data access, middleware) lives in its own layer, following the standard MVC pattern.
+**SE Criterion met:** Code Modularization — routes / controllers / services / models / middlewares are cleanly separated.
 
 ---
 
 ## 4. MongoDB Data Models
 
-Defined per Architecture Document §9. Each Mongoose schema includes field-level validation constraints to enforce data integrity.
+The Gateway manages exactly **two MongoDB collections**.
 
 ### 4.1 `User`
 ```js
 {
   email:        { type: String, required: true, unique: true, lowercase: true },
-  passwordHash: { type: String, required: true },
+  passwordHash: { type: String, required: true },  // bcrypt hash, never plaintext
   profile:      { displayName: String, avatarUrl: String },
   preferences:  { currency: String, language: String },
-  createdAt:    Date
+  createdAt:    Date,   // via timestamps: true
+  updatedAt:    Date
 }
 ```
 
-### 4.2 `Session`
+### 4.2 `Favorite` (revised — confirmed)
+
+> **Key design change from v1.0:** Result cards live in LangGraph's memory, not MongoDB. When the user clicks ❤️ Save in the ResultPanel, the **frontend sends the full card object** to the Gateway, which embeds it directly in the favorite document.
+
+> **Deduplication strategy (confirmed):** A unique compound index on `(userId, cardId)` prevents double-saves. The `cardId` comes from the `id` field that LangGraph assigns to each result card — Agent teammate must ensure every card has a stable `id`.
+
+> **Minimum `cardData` contract (confirmed from `ResultPanel.jsx` analysis):** The frontend always sends `{ id, type, title, price }` when saving. Additional LangGraph-specific fields are stored transparently via `Mixed` type.
+
 ```js
 {
-  userId:    { type: ObjectId, ref: 'User', required: true },
-  title:     { type: String, default: 'New Trip' },
-  status:    {
-    type: String,
-    enum: ['draft','collecting_requirements','ready_to_start',
-           'running','partially_completed','completed','cancelled','failed'],
-    default: 'draft'
-  },
-  tripBrief: Object,   // structured requirements confirmed by user
-  createdAt: Date,
-  updatedAt: Date
+  userId:   { type: ObjectId, ref: 'User', required: true },
+  cardId:   { type: String,   required: true },  // LangGraph card's own 'id' — dedup key
+  cardType: { type: String,   enum: ['flight','hotel','itinerary','tips'], required: true },
+  cardData: { type: Mixed,    required: true },   // min fields: { id, type, title, price }
+  note:     { type: String,   default: '' },
+  savedAt:  { type: Date,     default: Date.now }
 }
+// Unique index: { userId: 1, cardId: 1 } — rejects duplicate saves cleanly
 ```
 
-### 4.3 `Message`
-```js
-{
-  sessionId:      { type: ObjectId, ref: 'Session', required: true },
-  role:           { type: String, enum: ['user', 'agent'], required: true },
-  content:        { type: String, required: true },
-  structuredMeta: Object   // optional structured fields from agent
-}
-```
-
-### 4.4 `AgentEvent`
-```js
-{
-  sessionId: { type: ObjectId, ref: 'Session' },
-  agentKey:  String,   // e.g. 'flight_agent', 'hotel_agent'
-  eventType: String,   // per Appendix B enum
-  status:    String,   // idle/queued/running/done/failed/cancelled
-  message:   String,
-  payload:   Object,
-  ts:        { type: Date, default: Date.now }
-}
-```
-
-### 4.5 `ResultCard`
-```js
-{
-  sessionId:   { type: ObjectId, ref: 'Session' },
-  type:        { type: String, enum: ['flight','hotel','itinerary','tips'] },
-  rank:        Number,
-  content:     Object,
-  sourceLinks: [String]
-}
-```
-
-### 4.6 `Favorite`
-```js
-{
-  userId:       { type: ObjectId, ref: 'User', required: true },
-  sessionId:    { type: ObjectId, ref: 'Session' },
-  resultCardId: { type: ObjectId, ref: 'ResultCard' },
-  note:         String,
-  savedAt:      { type: Date, default: Date.now }
-}
-```
+> **Sidebar rendering (confirmed from `Sidebar.jsx` analysis):** The favorites list only reads `cardType` (for icon ✈️/🏨) and `cardData.title` (for display text). No additional fields are required for list rendering.
 
 ---
 
-## 5. API Endpoint Design (MVP)
+## 5. API Endpoint Design (Final Scope)
 
 All protected routes require `Authorization: Bearer <token>` header.  
 All request bodies are validated by Zod schemas before reaching controllers.
@@ -202,120 +152,71 @@ All request bodies are validated by Zod schemas before reaching controllers.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/auth/register` | Register with email + password |
-| POST | `/api/auth/login` | Login; returns JWT `{ token }` in response body |
+| POST | `/api/auth/register` | Register with email + password; returns `{ token, user }` |
+| POST | `/api/auth/login` | Login; returns `{ token, user }` |
 
-> **Decision (confirmed):** JWT is returned in the response body and stored in `localStorage` on the client. This avoids the need for `credentials: 'include'` on every frontend `fetch` call and keeps the frontend integration simple. A `POST /api/auth/logout` endpoint is still provided for completeness (client deletes the token from storage).
+> **Decision:** JWT is returned in the response body, stored in `localStorage`. No HttpOnly cookie needed — no CORS `credentials` complexity.
 
-### 5.2 Protected User Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/auth/logout` | Stateless logout (signals client to discard token) |
-| GET | `/api/sessions` | List current user's sessions (paginated) |
-| POST | `/api/sessions` | Create a new trip planning session |
-| GET | `/api/sessions/:id` | Get session detail + messages + result cards |
-| POST | `/api/sessions/:id/messages` | Send a chat message (persisted) |
-| POST | `/api/sessions/:id/start` | Forward execution trigger to Orchestrator |
-| POST | `/api/sessions/:id/stop` | Send cancel signal; mark session `cancelled` |
-| GET | `/api/sessions/:id/events` | Open SSE stream for real-time agent events |
-| GET | `/api/sessions/:id/mock-events` | (Dev only) SSE stream replaying mock agent stages |
-| GET | `/api/favorites` | List current user's saved favorites |
-| POST | `/api/favorites` | Save a result card to favorites |
-| DELETE | `/api/favorites/:id` | Remove a favorite |
-
-### 5.3 Internal Endpoints (Orchestrator → Gateway only)
+### 5.2 Protected Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/internal/events` | Orchestrator pushes agent events; Gateway broadcasts via SSE and writes to `agent_events` |
-| POST | `/internal/results` | Orchestrator pushes final result cards; Gateway writes to `result_cards` and updates session status |
+| POST | `/api/auth/logout` | Stateless logout (client discards token; endpoint signals intent) |
+| GET | `/api/favorites` | List all favorites for the authenticated user |
+| POST | `/api/favorites` | Save a card — frontend sends full card JSON in body |
+| DELETE | `/api/favorites/:id` | Remove a favorite by MongoDB `_id` |
 
-> **Decision (confirmed):** The **Gateway is the single writer to MongoDB** for all collections. The Orchestrator never connects to MongoDB directly — it posts results and events back to the Gateway via these two internal endpoints. This enforces a clean service boundary and keeps the DB access layer centralised.
+> **Total endpoint count: 5 user-facing + 1 health check.** This is intentionally minimal; the complexity of the project lives in the LangGraph layer.
+
+### 5.3 Health Check
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Liveness probe; no auth required |
 
 ---
 
-## 6. Authentication & Session Flow
+## 6. Authentication Flow
 
 ```
-[Client]                    [Gateway]                     [MongoDB]
-  │── POST /api/auth/login ──▶│                               │
-  │    { email, password }    │── User.findOne(email) ───────▶│
-  │                           │◀─── User doc ────────────────│
-  │                           │ bcrypt.compare(pw, hash)      │
-  │◀── 200 { token } ─────────│ jwt.sign({ userId, email })   │
-  │                           │                               │
-  │── GET /api/sessions ──────▶│                               │
-  │   Authorization: Bearer..  │ authMiddleware verifies JWT   │
-  │                           │── Session.find({ userId }) ───▶│
-  │◀── 200 [sessions] ────────│◀── sessions ─────────────────│
+[Client]                    [Gateway]                   [MongoDB]
+  │── POST /api/auth/login ──▶│                              │
+  │    { email, password }    │── User.findOne(email) ──────▶│
+  │                           │◀── User doc ────────────────│
+  │                           │ bcrypt.compare(pw, hash)     │
+  │◀── 200 { token, user } ───│ jwt.sign({ userId, email })  │
+  │                           │                              │
+  │  (store token in localStorage)                           │
+  │                           │                              │
+  │── POST /api/favorites ────▶│                              │
+  │   Authorization: Bearer.. │ authMiddleware verifies JWT  │
+  │   { cardType, cardData }  │── Favorite.create({...}) ───▶│
+  │◀── 201 { favorite } ──────│◀── saved doc ───────────────│
 ```
 
 **Security notes:**
-- Passwords are hashed with `bcryptjs` (salt rounds = 12); plaintext is never stored.
-- JWT tokens expire in 24h; resource ownership is verified on every session/message/favorite query.
-- HttpOnly cookie option available as enhancement over raw Authorization header.
+- Passwords hashed with `bcryptjs` (salt rounds = 12); plaintext never stored or logged.
+- JWT expires in 24h; every protected route verifies ownership via `req.user.userId`.
+- Rate limiting on auth endpoints prevents brute-force attempts.
 
 ---
 
-## 7. SSE Event Bridge Design (Novel Feature)
-
-The SSE endpoint is the most technically complex component. It bridges the real-time progress stream from the Python Orchestrator to connected browser clients.
-
-### 7.1 Connection Lifecycle
-```
-[Browser]                  [Gateway SSE Manager]         [Orchestrator]
-  │── GET /api/sessions/:id/events ──▶│                       │
-  │   (EventSource JS API)            │ store client in Map   │
-  │◀── headers: text/event-stream ────│                       │
-  │                                   │                       │
-  │  (Agent is running on Orch. side) │                       │
-  │                                   │◀── POST /internal/events│
-  │                                   │   { agentKey, status,  │
-  │                                   │     message, payload } │
-  │◀── SSE: data: { eventType, ... } ─│ broadcast to session   │
-  │◀── SSE: data: { ... } ────────────│ clients               │
-  │                                   │                       │
-  │── (user closes tab) ──────────────▶│ remove from Map       │
-```
-
-### 7.2 Standardised SSE Event Schema
-Every event pushed to the client conforms to this shape (Architecture Doc §8):
-```json
-{
-  "sessionId": "sess_abc123",
-  "eventType": "step.updated",
-  "agentKey":  "flight_agent",
-  "status":    "running",
-  "message":   "Found 12 flight candidates on Google Flights",
-  "payload":   { "candidateCount": 12, "currentStep": "Searching Trip.com" },
-  "ts":        "2026-04-20T10:22:00Z"
-}
-```
-
-### 7.3 Frontend Integration Contract
-The frontend (`MainPage.jsx`) already implements a state machine (`PHASE_TRANSITIONS`) and agent status model (`idle/working/done`) driven by staged snapshots. After gateway integration, the mock timeline (`buildExecutionStages + setTimout`) will be replaced with a live `EventSource` connection to `/api/sessions/:id/events`. The `agentKey` in each SSE event maps directly to the agent `id` field in `MOCK_AGENTS` (`flight`, `hotel`, `itinerary`, `tips`).
-
----
-
-## 8. Idempotency & Error Handling Strategy
-
-Per Architecture Doc §14:
+## 7. Error Handling Strategy
 
 | Scenario | Gateway Behaviour |
 |---------|-----------------|
-| `POST /start` on already-running session | Return `409 Conflict` with current status; do not re-trigger Orchestrator |
-| Orchestrator returns error | Log to `agent_events` as `status: failed`; push SSE `session.failed` event; session status → `partially_completed` |
-| `POST /stop` | Send cancel signal to Orchestrator; set session→`cancelled`; do NOT delete any existing `result_cards` |
-| Invalid request body | Zod middleware returns `400 { errors: [...] }` before controller is reached |
+| Invalid request body | Zod middleware returns `400 { error, errors: [{field, message}] }` |
 | Unauthenticated request | `auth.middleware.js` returns `401 Unauthorized` |
-| Resource not owned by user | Controllers return `403 Forbidden` |
+| Email already registered | `409 Conflict` with descriptive message |
+| Wrong password | `401 Unauthorized` (intentionally same as "not found" to prevent enumeration) |
+| Favorite not found / not owned | `404 Not Found` |
+| Unhandled server error | Centralized error handler returns `500` with stack trace in dev, generic message in prod |
 
 ---
 
-## 9. Setup Automation
+## 8. Setup Automation
 
-Per Rubrics: *"Scripts to automatically setup the back-end environment"*.
+Per Rubrics: *"Scripts to automatically setup the back-end environment."*
 
 ### `gateway/package.json` scripts
 ```json
@@ -328,7 +229,7 @@ Per Rubrics: *"Scripts to automatically setup the back-end environment"*.
 }
 ```
 
-### `docker-compose.yml` (project root / `docker/`)
+### `docker-compose.yml` (project root `docker/`)
 ```yaml
 services:
   frontend:
@@ -339,9 +240,9 @@ services:
     ports: ["8080:8080"]
     env_file: ./gateway/.env
     depends_on: [mongodb]
-  orchestrator:
+  langgraph:
     build: ./backend
-    ports: ["8081:8081"]
+    ports: ["2024:2024"]
   mongodb:
     image: mongo:7
     ports: ["27017:27017"]
@@ -357,61 +258,78 @@ docker-compose up --build
 
 ---
 
-## 10. Logging & Observability
+## 9. Logging & Observability
 
 | Log Type | Tool | Content |
 |---------|------|---------|
 | Access log | `morgan` (stdout) | Method, path, status, response time |
-| Error log | `winston` (file + stderr) | Stack traces, unhandled exceptions |
-| Business audit | `AgentEvent` collection | Agent activity, timestamps, payloads |
-
-Three categories per Architecture Doc §16:
-- **Operational logs:** session creation, task start/complete, bookmark events.
-- **Error logs:** failed Orchestrator calls, LLM timeouts, auth failures.
-- **Event audit:** `agent_events` collection is the primary debugging artefact.
+| Error log | `winston` | Stack traces, unhandled exceptions |
+| Auth audit | console + winston | Register/login events with timestamp and email |
+| Favorites audit | console + winston | Save/delete events with userId |
 
 ---
 
-## 11. Development Phases & Git Commit Plan
+## 10. Development Phases & Git Commit Plan
 
-Per Rubrics: *"Committing all your code in Week 13 is not allowed"* — continuous commits are required.
+Per Rubrics: *"Committing all your code in Week 13 is not allowed."*
 
-| Phase | Deliverable | Git Commit Message |
-|-------|------------|-------------------|
-| **1** | Project init + all Mongoose schemas | `chore(gateway): init express project and define all mongoose schemas` |
-| **2** | Auth endpoints + middleware | `feat(auth): register/login with bcrypt and jwt middleware` |
-| **3** | Session/Message/Favorite CRUD + Zod validation | `feat(api): session message favorite crud with zod validation` |
-| **4** | `/start`, `/stop`, SSE bridge | `feat(orchestrator): integrate python agent via http and sse event bridge` |
-| **5** | Dockerfile, docker-compose, seed script | `ops: add dockerfile compose and db seed for one-command setup` |
+| Phase | Deliverable | Status | Git Commit Message |
+|-------|------------|--------|--------------------|
+| **1** | Project init + Mongoose schemas + server.js stubs | ✅ Done | `chore(gateway): init express project and define all mongoose schemas` |
+| **2** | Auth: register / login / logout + JWT middleware | ⏳ Next | `feat(auth): register/login/logout with bcrypt and jwt middleware` |
+| **3** | Favorites CRUD + Zod validation + cleanup of unused schemas | — | `feat(favorites): favorites crud with zod validation and schema cleanup` |
+| **4** | Dockerfile finalization, docker-compose, seed script | — | `ops: finalize dockerfile compose and add db seed script` |
+
+> **Phase 3 note:** The unused schemas (`Session.js`, `Message.js`, `ResultCard.js`, `AgentEvent.js`) will be removed from active use in this phase commit to keep the codebase clean, while being preserved in git history.
 
 ---
 
-## 12. Rubrics Alignment Summary
+## 11. Rubrics Alignment Summary
 
 | IT5007 Rubric Criterion | How Gateway Addresses It |
 |------------------------|--------------------------|
-| **Back-end Architecture** | Multi-tier routing: Express → Mongoose/MongoDB + HTTP → Python Orchestrator → 3rd-party APIs |
-| **Complex Back-end (A-grade differentiator)** | SSE real-time bridge; multi-service internal routing; interaction between back-end services |
-| **3rd-party API Integration** | Orchestrator service (internally) integrates Google Flights, Booking.com, OpenAI, Weather APIs |
-| **Authentication (own DB)** | bcrypt password hashing in MongoDB `users` collection; JWT session management |
-| **Session maintenance** | Every API route validates JWT and queries are scoped by `userId` |
-| **Setup Automation** | `docker-compose up --build` launches all 4 services; `.env.example` + seed script included |
-| **Documentation** | JSDoc function-level comments throughout; this PDR doc; README feature list |
-| **Usability (invalid input)** | Zod DTO validation on every non-GET endpoint; consistent `400` error shape |
-| **Code Modularization** | routes / controllers / services / models / middlewares layer separation |
-| **Code Originality** | All gateway code is original; borrowed code (e.g. DeerFlow patterns) declared in README |
-| **Continuous Commits** | One commit per phase (minimum); meaningful commit messages per plan above |
+| **Back-end Architecture** | Documented separation: Express Gateway (auth/favorites) + LangGraph Server (agents/SSE) — mirrors DeerFlow's bifurcated architecture |
+| **Authentication (own DB)** | bcrypt password hashing in MongoDB `users`; JWT session management scoped per user |
+| **Session maintenance** | JWT carried in every protected request; `userId` extracted and used to scope all DB queries |
+| **Setup Automation** | `docker-compose up --build` starts all services; `.env.example` + seed script included |
+| **Documentation** | JSDoc function-level comments throughout; this PDR doc; README feature list to be updated |
+| **Usability (invalid input)** | Zod validation on every POST endpoint; consistent `400` error shape with field-level messages |
+| **Code Modularization** | routes / controllers / services / models / middlewares clean separation |
+| **Code Originality** | All gateway code is original; DeerFlow architecture referenced but not copied |
+| **Continuous Commits** | One meaningful commit per phase across multiple weeks |
+
+> [!WARNING]
+> **Grading Risk — Acknowledged:** With Gateway scope reduced to Auth + Favorites CRUD, the "Complex Back-end" and "Novel Features" criteria now fall entirely on the LangGraph layer. This is acceptable only if the **team's overall submission** demonstrates sufficient backend complexity through the LangGraph-DeerFlow integration. Gateway's contribution to the back-end score is through **authentication correctness, data validation robustness, and clean SE practices** — not architectural novelty.
 
 ---
 
-## 13. Resolved Design Decisions
+## 12. Outstanding Teammate Actions Required
 
-All open questions from the initial draft have been resolved. No blocking decisions remain before Phase 1 can begin.
+> [!NOTE]
+> Issues A, B, and E have been **resolved through frontend code analysis** (`ResultPanel.jsx`, `Sidebar.jsx`, `MainPage.jsx`). The only remaining items require action from teammates — they do not block Gateway development.
 
-| # | Question | Decision |
-|---|---------|----------|
-| 1 | SSE ↔ Orchestrator protocol | **Callback model (chosen):** Orchestrator POSTs to `POST /internal/events` on Gateway; Gateway broadcasts to connected SSE clients. Gateway is always the event source of truth for the frontend. |
-| 2 | JWT client storage | **`localStorage` + Bearer Token (chosen):** Token returned in response body. Simpler for frontend; no CORS credential configuration needed. |
-| 3 | Mock SSE for early front-end integration | **Confirmed:** `GET /api/sessions/:id/mock-events` (dev-only) replays the 4 staged snapshots from `MainPage.jsx → buildExecutionStages()` so frontend can validate SSE wiring before Orchestrator is ready. |
-| 4 | Language | **JavaScript (chosen):** Plain JS throughout, consistent with frontend. Zod provides runtime validation. |
-| 5 | `result_cards` write ownership | **Gateway (chosen):** Orchestrator POSTs final cards to `POST /internal/results`; Gateway writes to MongoDB and updates session status. Orchestrator has no direct DB access. |
+| # | Issue | Resolution / Action Needed | Owner | Blocks Dev? |
+|---|-------|---------------------------|-------|-------------|
+| **A** | Duplicate favorite prevention | ✅ **Resolved:** Use LangGraph card's own `id` field as `cardId`. Unique index `(userId, cardId)` handles dedup. Agent teammate must ensure every result card has a stable `id` field. | Agent teammate to confirm `id` exists on all cards | ❌ No |
+| **B** | Favorites sidebar rendering | ✅ **Resolved (from `Sidebar.jsx`):** Only `cardType` + `cardData.title` are read for list display. Embedded `cardData` is sufficient — no re-fetch from LangGraph needed. | No action needed | ❌ No |
+| **C** | CORS on LangGraph Server | ⚠️ **Action by Agent teammate only:** LangGraph Server (`:2024`) must allow `http://localhost:3000` in its CORS config. Gateway code requires zero changes. | Agent teammate | ❌ No (Gateway unaffected) |
+| **D** | User identity in LangGraph | ⚠️ **Agent teammate's design choice.** Gateway JWT payload is `{ userId, email, iat, exp }` — share this with Agent teammate if they want to accept our token. Gateway Auth can proceed without waiting. | Agent teammate | ❌ No |
+| **E** | `cardData` minimum field contract | ✅ **Resolved (from `ResultPanel.jsx`):** Frontend always sends `{ id, type, title, price }` when saving. Gateway Zod schema validates these 4 fields; extra fields pass through via `Mixed`. | No action needed | ❌ No |
+
+---
+
+## 13. Design Decisions Log
+
+| # | Question | Decision | Date |
+|---|---------|----------|------|
+| 1 | Language | **JavaScript** — consistent with frontend, no TS compiler overhead | Apr 2026 |
+| 2 | JWT storage | **`localStorage` + Bearer Token** — simpler CORS configuration | Apr 2026 |
+| 3 | Favorites data model | **Embed full card JSON** — no cross-service result card reference needed | Apr 2026 |
+| 4 | Gateway ↔ LangGraph communication | **Fully decoupled** — no callbacks, no proxying, no SSE bridging in Gateway | Apr 2026 |
+| 5 | Session / history management | **Delegated entirely to LangGraph Checkpointer** — out of Gateway scope | Apr 2026 |
+| 6 | SSE bridge | **Removed from Gateway scope** — frontend connects to LangGraph directly | Apr 2026 |
+| 7 | Duplicate favorite prevention | **`cardId` from LangGraph card's `id` field** — unique index `(userId, cardId)` rejects re-saves | Apr 2026 |
+| 8 | `cardData` minimum contract | **`{ id, type, title, price }`** confirmed from `ResultPanel.jsx` line 34–39; extra fields stored transparently | Apr 2026 |
+| 9 | Sidebar rendering requirements | **`cardType` + `cardData.title` only** — confirmed from `Sidebar.jsx` line 60–61; no additional fields needed | Apr 2026 |
+| 10 | Active Mongoose schemas | **User + Favorite only** — Session, Message, ResultCard, AgentEvent removed from active codebase | Apr 2026 |
+| 11 | Active routes | **`/api/auth/*` + `/api/favorites`** only — session/agent/internal routes removed from server.js | Apr 2026 |
