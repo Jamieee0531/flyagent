@@ -6,12 +6,15 @@ import './App.css'
 
 // top-level app component, handles auth routing
 function App() {
-  // TODO: Replace with real auth logic
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  // Replace with real auth persistence from localStorage
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('nomie_token'))
 
   const handleLogin = () => setIsLoggedIn(true)
 
-  const handleLogout = () => setIsLoggedIn(false)
+  const handleLogout = () => {
+    localStorage.removeItem('nomie_token')
+    setIsLoggedIn(false)
+  }
 
   // redirect to /login if not logged in, otherwise show main page
   return (

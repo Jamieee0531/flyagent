@@ -28,19 +28,53 @@ function LoginPage({ onLogin }) {
     return errs
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     const errs = validate()
     setErrors(errs)
     if (Object.keys(errs).length > 0) return
-    // TODO: Real auth API call
-    onLogin()
+
+    setErrors({ _general: 'Connecting...' })
+
+    try {
+      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login'
+      const response = await fetch(`http://localhost:8080${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Handle Zod array errors and basic error string
+        if (data.errors && Array.isArray(data.errors)) {
+          const apiErrs = {}
+          data.errors.forEach(err => {
+            if (err.field) apiErrs[err.field] = err.message
+          })
+          setErrors(apiErrs)
+        } else {
+          setErrors({ email: data.error || 'Authentication failed' })
+        }
+        return
+      }
+
+      // Success
+      localStorage.setItem('nomie_token', data.token)
+      onLogin()
+    } catch (err) {
+      setErrors({ email: 'Failed to connect to server' })
+    }
   }
 
   // clear errors when switching tabs
   const switchTab = (register) => {
     setIsRegister(register)
     setErrors({})
+    setEmail('')
+    setPassword('')
+    setConfirmPw('')
   }
 
   return (

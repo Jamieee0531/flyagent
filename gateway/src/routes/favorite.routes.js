@@ -43,8 +43,6 @@ const saveFavoriteSchema = z.object({
     errorMap: () => ({ message: 'cardType must be flight, hotel, itinerary, or tips' }),
   }),
   cardData: z.object({
-    id:    z.string().min(1, 'cardData.id is required'),
-    type:  z.string().min(1, 'cardData.type is required'),
     title: z.string().min(1, 'cardData.title is required'),
     price: z.string().optional(),
   }).passthrough(), // store all LangGraph fields; only validate the 4 guaranteed ones

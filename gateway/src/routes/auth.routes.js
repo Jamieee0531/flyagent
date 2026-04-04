@@ -35,7 +35,7 @@ const router = Router();
  */
 const registerSchema = z.object({
   email:       z.string().email('Invalid email address'),
-  password:    z.string().min(8, 'Password must be at least 8 characters'),
+  password:    z.string().min(6, 'Password must be at least 6 characters'),
   displayName: z.string().trim().max(64).optional(),
 });
 
