@@ -1,6 +1,6 @@
 # Nomie — API Gateway: Architecture & Preliminary Design Review (PDR)
 
-> **Author:** (Your Name / Matric Number)  
+> **Author:** (Li Zouran / A0329022N)  
 > **Component:** `gateway/` — Access Layer  
 > **Date:** April 2026  
 > **Course:** IT5007 · Software Engineering on Application Architecture  
@@ -276,9 +276,9 @@ Per Rubrics: *"Committing all your code in Week 13 is not allowed."*
 | Phase | Deliverable | Status | Git Commit Message |
 |-------|------------|--------|--------------------|
 | **1** | Project init + Mongoose schemas + server.js stubs | ✅ Done | `chore(gateway): init express project and define all mongoose schemas` |
-| **2** | Auth: register / login / logout + JWT middleware | ⏳ Next | `feat(auth): register/login/logout with bcrypt and jwt middleware` |
-| **3** | Favorites CRUD + Zod validation + cleanup of unused schemas | — | `feat(favorites): favorites crud with zod validation and schema cleanup` |
-| **4** | Dockerfile finalization, docker-compose, seed script | — | `ops: finalize dockerfile compose and add db seed script` |
+| **2** | Auth: register / login / logout + JWT middleware | ✅ Done | `feat(auth): register/login/logout with bcrypt and jwt middleware` |
+| **3** | Favorites CRUD + Zod validation + cleanup of unused schemas | ✅ Done | `feat(favorites): favorites crud with zod validation and schema cleanup` |
+| **4** | Dockerfile, docker-compose, seed script, README update | ✅ Done | `ops(gateway): add dockerfile, docker-compose, seed script and update readme` |
 
 > **Phase 3 note:** The unused schemas (`Session.js`, `Message.js`, `ResultCard.js`, `AgentEvent.js`) will be removed from active use in this phase commit to keep the codebase clean, while being preserved in git history.
 

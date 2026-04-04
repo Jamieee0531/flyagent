@@ -1,0 +1,65 @@
+# ============================================================
+# docker-compose.yml — Nomie full-stack development environment
+# ============================================================
+# Services:
+#   mongodb     — MongoDB 7 database
+#   api-gateway — Node.js/Express auth + favorites service (:8080)
+#
+# LangGraph Server (Python backend) and the React frontend are
+# started separately during development; they will be added to
+# this file in a later ops phase once all services are stable.
+#
+# Usage:
+#   docker-compose up --build          # first run / rebuild images
+#   docker-compose up                  # subsequent runs
+#   docker-compose down -v             # stop and remove volumes
+#   docker-compose exec api-gateway sh # shell into running gateway
+# ============================================================
+
+version: "3.9"
+
+services:
+  # ----------------------------------------------------------
+  # MongoDB — primary datastore for users and favorites
+  # ----------------------------------------------------------
+  mongodb:
+    image: mongo:7
+    container_name: nomie-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ----------------------------------------------------------
+  # API Gateway — Express auth + favorites service
+  # ----------------------------------------------------------
+  api-gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: nomie-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./gateway/.env.docker
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  mongo_data:
+    driver: local
