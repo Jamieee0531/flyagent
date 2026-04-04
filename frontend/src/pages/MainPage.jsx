@@ -237,7 +237,7 @@ const MOCK_RESULTS = {
 // manages session state and switches between chat/executing/result views
 function MainPage({ onLogout }) {
   const [sessions] = useState(MOCK_SESSIONS)
-  const [favorites, setFavorites] = useState(MOCK_FAVORITES)
+  const [favorites, setFavorites] = useState([])
   const [currentSessionId, setCurrentSessionId] = useState(null)
   const [phase, setPhase] = useState(PHASE.CHAT)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -327,6 +327,29 @@ function MainPage({ onLogout }) {
   }
 
   useEffect(() => {
+    const fetchFavorites = async () => {
+      const token = localStorage.getItem('nomie_token')
+      if (!token) return
+      try {
+        const res = await fetch('http://localhost:8080/api/favorites', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setFavorites(data.favorites.map(d => ({
+            id: d.cardId,
+            dbId: d._id,
+            type: d.cardType,
+            title: d.cardData.title,
+            price: d.cardData.price
+          })))
+        }
+      } catch (e) {
+        console.error('Failed to fetch favorites', e)
+      }
+    }
+    fetchFavorites()
+
     return () => {
       clearExecutionTimers()
     }
@@ -360,12 +383,52 @@ function MainPage({ onLogout }) {
   }
 
   // add or remove item from favorites list
-  const handleToggleFavorite = (item) => {
+  const handleToggleFavorite = async (item) => {
+    const token = localStorage.getItem('nomie_token')
+    if (!token) return
+
     const exists = favorites.find(f => f.id === item.id)
     if (exists) {
+      // Optimistic delete
       setFavorites(favorites.filter(f => f.id !== item.id))
+      try {
+        await fetch(`http://localhost:8080/api/favorites/${exists.dbId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      } catch (e) { console.error(e) }
     } else {
-      setFavorites([...favorites, item])
+      try {
+        const res = await fetch('http://localhost:8080/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            cardId: item.id,
+            cardType: item.type,
+            cardData: { title: item.title, price: item.price }
+          })
+        })
+        if (!res.ok) {
+          const errData = await res.json()
+          console.error('Save failed:', errData)
+          if (res.status === 409) {
+            // Already saved, silent fail UI
+            setFavorites([...favorites, { ...item, dbId: 'fake-conflict' }])
+          }
+          return
+        }
+        const data = await res.json()
+        setFavorites([...favorites, {
+          id: item.id,
+          dbId: data.favorite?._id || data._id,
+          type: item.type,
+          title: item.title,
+          price: item.price
+        }])
+      } catch (e) { console.error(e) }
     }
   }
 
