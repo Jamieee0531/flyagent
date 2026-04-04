@@ -2,27 +2,34 @@
  * @file auth.middleware.js
  * @description JWT authentication middleware.
  *
- * Verifies the Bearer token in the Authorization header and attaches the
- * decoded payload to req.user so downstream controllers can access userId.
+ * Extracts and verifies the Bearer token from the Authorization header.
+ * On success, attaches the decoded payload to req.user so downstream
+ * controllers can access { userId, email } without repeating token logic.
  *
- * Implementation: Phase 2
+ * On failure, responds immediately with 401 — no further middleware runs.
  */
 
 'use strict';
 
-// TODO (Phase 2): implement JWT verification.
-// const jwt = require('jsonwebtoken');
-//
-// module.exports = function auth(req, res, next) {
-//   const header = req.headers.authorization || '';
-//   const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
-//   if (!token) return res.status(401).json({ error: 'No token provided' });
-//   try {
-//     req.user = jwt.verify(token, process.env.JWT_SECRET);
-//     next();
-//   } catch {
-//     res.status(401).json({ error: 'Invalid or expired token' });
-//   }
-// };
+const { verifyToken } = require('../services/auth.service');
 
-module.exports = (_req, _res, next) => next(); // passthrough until Phase 2
+/**
+ * Verify the JWT in `Authorization: Bearer <token>` and populate req.user.
+ *
+ * @type {import('express').RequestHandler}
+ */
+module.exports = function authMiddleware(req, res, next) {
+  const header = req.headers.authorization || '';
+  const token  = header.startsWith('Bearer ') ? header.slice(7) : null;
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  try {
+    req.user = verifyToken(token); // { userId, email, iat, exp }
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+};

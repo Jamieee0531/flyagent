@@ -27,7 +27,9 @@ function validate(schema) {
     const result = schema.safeParse(req.body);
     if (!result.success) {
       // Format Zod issues into a simpler array for frontend consumption
-      const errors = result.error.errors.map((e) => ({
+      // Use .issues (canonical Zod v3 field); .errors is an alias that can be
+      // undefined in edge cases when safeParse receives unexpected input types.
+      const errors = (result.error.issues ?? result.error.errors ?? []).map((e) => ({
         field:   e.path.join('.'),
         message: e.message,
       }));
