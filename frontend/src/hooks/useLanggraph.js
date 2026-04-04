@@ -43,6 +43,7 @@ export function useLanggraph() {
   const [sessions, setSessions] = useState([])
   const [currentThreadId, setCurrentThreadId] = useState(null)
   const [isSending, setIsSending] = useState(false)
+  const [executionStarted, setExecutionStarted] = useState(false)
 
   // refs for values that change during streaming but shouldn't trigger re-renders
   const streamHandleRef = useRef(null)
@@ -82,73 +83,90 @@ export function useLanggraph() {
 
   function handleSSEEvent(eventType, data) {
     if (eventType === 'messages-tuple' || eventType === 'messages') {
-      // messages-tuple carries individual message updates
-      if (Array.isArray(data)) {
-        // LangGraph sends [messageType, messageData] tuple format
-        const [msgType, msgData] = data
-        handleMessageTuple(msgType, msgData)
+      // LangGraph sends [messageChunk, metadata] array
+      // messageChunk has .type, .content, .tool_calls etc.
+      if (Array.isArray(data) && data.length >= 1) {
+        const msgChunk = data[0]
+        handleMessageChunk(msgChunk)
       } else if (data && data.type) {
-        handleMessageTuple(data.type, data)
+        handleMessageChunk(data)
       }
     } else if (eventType === 'custom') {
       handleCustomEvent(data)
     } else if (eventType === 'values') {
       handleValuesEvent(data)
+    } else if (eventType === 'metadata') {
+      // extract run_id from metadata event
+      if (data && data.run_id) {
+        currentRunIdRef.current = data.run_id
+      }
     }
   }
 
-  function handleMessageTuple(msgType, msgData) {
-    if (msgType === 'ai' || msgData.type === 'ai') {
-      // check for tool calls to task() — this tells us execution is starting
-      if (msgData.tool_calls && msgData.tool_calls.length > 0) {
-        for (const tc of msgData.tool_calls) {
-          if (tc.name === 'task') {
-            didDispatchRef.current = true
-            // build task_id -> panel agent id mapping
-            const subagentType = tc.args?.subagent_type
-            if (subagentType && tc.id) {
-              taskMapRef.current[tc.id] = SUBAGENT_TO_PANEL_ID[subagentType] || subagentType
-            }
-          }
-        }
-        return // don't show tool call messages in chat
-      }
+  function handleMessageChunk(msg) {
+    // skip non-AI messages (human, tool results)
+    const msgType = msg.type
+    if (msgType !== 'AIMessageChunk' && msgType !== 'ai') return
 
-      // AI text content — stream into chat
-      const content = typeof msgData.content === 'string'
-        ? msgData.content
-        : Array.isArray(msgData.content)
-          ? msgData.content.map((b) => (typeof b === 'string' ? b : b.text || '')).join('')
-          : ''
+    // skip tool call messages (task dispatch) — don't show in chat
+    if (msg.tool_calls && msg.tool_calls.length > 0) return
+    // skip tool_call_chunks (partial tool calls during streaming)
+    if (msg.tool_call_chunks && msg.tool_call_chunks.length > 0) return
 
-      if (!content) return
+    // AI text content — stream into chat
+    const content = typeof msg.content === 'string'
+      ? msg.content
+      : Array.isArray(msg.content)
+        ? msg.content.map((b) => (typeof b === 'string' ? b : b.text || '')).join('')
+        : ''
 
-      setMessages((prev) => {
-        const last = prev[prev.length - 1]
-        // if last message is a streaming agent message, append to it
-        if (last && last.role === 'agent' && last.isStreaming) {
-          return [
-            ...prev.slice(0, -1),
-            { ...last, text: last.text + content },
-          ]
-        }
-        // otherwise start a new streaming message
+    if (!content) return
+
+    setMessages((prev) => {
+      const last = prev[prev.length - 1]
+      // if last message is a streaming agent message, append to it
+      if (last && last.role === 'agent' && last.isStreaming) {
         return [
-          ...prev,
-          { id: `msg-${Date.now()}`, role: 'agent', text: content, isStreaming: true },
+          ...prev.slice(0, -1),
+          { ...last, text: last.text + content },
         ]
-      })
-    }
-    // tool result messages are ignored in the chat UI
+      }
+      // otherwise start a new streaming message
+      return [
+        ...prev,
+        { id: `msg-${Date.now()}`, role: 'agent', text: content, isStreaming: true },
+      ]
+    })
+  }
+
+  // infer panel agent id from task_started description
+  function inferPanelId(description) {
+    const desc = (description || '').toLowerCase()
+    if (desc.includes('flight')) return 'flight'
+    if (desc.includes('hotel') || desc.includes('accommodation')) return 'hotel'
+    if (desc.includes('itinerary') || desc.includes('plan')) return 'itinerary'
+    if (desc.includes('tip') || desc.includes('advice') || desc.includes('travel')) return 'tips'
+    return null
   }
 
   function handleCustomEvent(data) {
     if (!data || !data.type) return
     const taskId = data.task_id
+
+    // on task_started, build the task_id -> panel_id mapping from description
+    if (data.type === 'task_started') {
+      const panelId = inferPanelId(data.description)
+      if (panelId) {
+        taskMapRef.current[taskId] = panelId
+      }
+    }
+
     const panelId = taskMapRef.current[taskId]
     if (!panelId) return
 
     if (data.type === 'task_started') {
+      didDispatchRef.current = true
+      setExecutionStarted(true)
       setAgents((prev) =>
         prev.map((a) =>
           a.id === panelId
@@ -204,30 +222,144 @@ export function useLanggraph() {
   }
 
   function tryParseResults(text) {
-    // try to find a JSON code block first
+    // 1. try JSON code block
     const jsonBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
     if (jsonBlockMatch) {
-      try {
-        return JSON.parse(jsonBlockMatch[1].trim())
-      } catch {
-        // fall through
-      }
+      try { return JSON.parse(jsonBlockMatch[1].trim()) } catch { /* fall through */ }
     }
-    // try to find a raw JSON object
+    // 2. try raw JSON object
     const braceStart = text.indexOf('{')
     const braceEnd = text.lastIndexOf('}')
     if (braceStart !== -1 && braceEnd > braceStart) {
-      try {
-        return JSON.parse(text.slice(braceStart, braceEnd + 1))
-      } catch {
-        // fall through
+      try { return JSON.parse(text.slice(braceStart, braceEnd + 1)) } catch { /* fall through */ }
+    }
+    // 3. parse markdown structure from Lead Agent's natural language output
+    return parseMarkdownResults(text)
+  }
+
+  function parseMarkdownResults(text) {
+    const results = { flights: [], hotels: [], itinerary: [], tips: [] }
+
+    // split by ### or ## headers
+    const sections = text.split(/#{2,3}\s+/)
+
+    for (const section of sections) {
+      const lower = section.toLowerCase()
+      if (lower.startsWith('航班') || lower.startsWith('flight')) {
+        results.flights = parseFlights(section)
+      } else if (lower.startsWith('酒店') || lower.startsWith('hotel') || lower.startsWith('accommodation')) {
+        results.hotels = parseHotels(section)
+      } else if (lower.startsWith('行程') || lower.startsWith('itinerary') || lower.startsWith('day')) {
+        results.itinerary = parseItinerary(section)
+      } else if (lower.startsWith('旅行') || lower.startsWith('travel') || lower.startsWith('tip') || lower.startsWith('注意')) {
+        results.tips = parseTips(section)
       }
     }
-    return null
+
+    // if we found at least some data, return structured results
+    const hasData = results.flights.length > 0 || results.hotels.length > 0 ||
+                    results.itinerary.length > 0 || results.tips.length > 0
+    return hasData ? results : null
+  }
+
+  function extractLink(text) {
+    const match = text.match(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/)
+    if (match) return match[2]
+    const urlMatch = text.match(/(https?:\/\/[^\s)]+)/)
+    return urlMatch ? urlMatch[1] : ''
+  }
+
+  function parseFlights(section) {
+    // split by numbered items: "1." "2." etc.
+    const items = section.split(/\n\s*\d+\.\s+/).filter(Boolean)
+    return items.map((item, i) => {
+      const lines = item.replace(/\n/g, ' ')
+      // extract airline name from first bold text
+      const airlineMatch = lines.match(/\*\*([^*]+)\*\*/)
+      const airline = airlineMatch ? airlineMatch[1].replace(/航班\s*/, '') : `Flight ${i + 1}`
+      // extract route
+      const routeMatch = lines.match(/航线\*?\*?[:：]\s*([^-–\n]*(?:→|->|to)[^-–\n]*)/) ||
+                         lines.match(/([A-Z]{3}\s*(?:→|->|to)\s*[A-Z]{3})/) ||
+                         lines.match(/route\*?\*?[:：]\s*([^-–\n]*)/i)
+      const route = routeMatch ? routeMatch[1].trim().replace(/\*\*/g, '') : ''
+      // extract date
+      const dateMatch = lines.match(/日期[^:：]*[:：]\s*([^-–]*?)(?=\s*-\s*\*|$)/) ||
+                       lines.match(/date[^:：]*[:：]\s*([^-–]*?)(?=\s*-\s*\*|$)/i) ||
+                       lines.match(/出发[^:：]*[:：]\s*([^-–]*?)(?=\s*-\s*\*|$)/)
+      const date = dateMatch ? dateMatch[1].trim().replace(/\*\*/g, '').slice(0, 60) : ''
+      // extract price
+      const priceMatch = lines.match(/价格\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
+                        lines.match(/price\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i) ||
+                        lines.match(/([\$¥€]\s*[\d,]+[^-–\n]*?)(?=\s*-\s*\*|$)/) ||
+                        lines.match(/(\d+\s*(?:SGD|CNY|USD|RMB|新加坡元|人民币)[^-–\n]*?)(?=\s*-\s*\*|$)/)
+      const price = priceMatch ? priceMatch[1].trim().replace(/\*\*/g, '') : ''
+      const link = extractLink(lines)
+      return { id: `f${i + 1}`, airline, route, date, price, link }
+    }).filter((f) => f.airline !== `Flight 0`)
+  }
+
+  function parseHotels(section) {
+    const items = section.split(/\n\s*\d+\.\s+/).filter(Boolean)
+    return items.map((item, i) => {
+      const lines = item.replace(/\n/g, ' ')
+      const nameMatch = lines.match(/\*\*([^*]+)\*\*/)
+      const name = nameMatch ? nameMatch[1] : `Hotel ${i + 1}`
+      const locationMatch = lines.match(/位置\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
+                           lines.match(/location\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i)
+      const location = locationMatch ? locationMatch[1].trim().replace(/\*\*/g, '') : ''
+      const priceMatch = lines.match(/价格\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
+                        lines.match(/price\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i)
+      const price = priceMatch ? priceMatch[1].trim().replace(/\*\*/g, '') : ''
+      const ratingMatch = lines.match(/评[分级]\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
+                         lines.match(/rating\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i)
+      const rating = ratingMatch ? ratingMatch[1].trim().replace(/\*\*/g, '') : ''
+      const link = extractLink(lines)
+      return { id: `h${i + 1}`, name, location, price, rating, link }
+    }).filter((h) => h.name !== 'Hotel 0')
+  }
+
+  function parseItinerary(section) {
+    const days = []
+    // match patterns like "第1天" "Day 1" "**第1天**"
+    const dayPattern = /(?:\*\*)?(?:第(\d+)天|Day\s*(\d+))(?:\*\*)?[:：]?\s*(.*?)(?=(?:\*\*)?(?:第\d+天|Day\s*\d+)|\s*$)/gi
+    let match
+    while ((match = dayPattern.exec(section)) !== null) {
+      const dayNum = parseInt(match[1] || match[2])
+      const plan = match[3].trim().replace(/\*\*/g, '').replace(/^[-–]\s*/, '')
+      if (plan) days.push({ day: dayNum, plan })
+    }
+    // fallback: split by "- **第X天**" pattern
+    if (days.length === 0) {
+      const lines = section.split(/\n/).filter((l) => l.trim())
+      let dayNum = 1
+      for (const line of lines) {
+        const cleaned = line.replace(/^[-\s*]+/, '').replace(/\*\*/g, '').trim()
+        if (cleaned && cleaned.length > 5) {
+          const numMatch = cleaned.match(/^第?(\d+)[天日]/)
+          if (numMatch) dayNum = parseInt(numMatch[1])
+          const plan = cleaned.replace(/^第?\d+[天日][：:]?\s*/, '')
+          if (plan) days.push({ day: dayNum++, plan })
+        }
+      }
+    }
+    return days
+  }
+
+  function parseTips(section) {
+    const tips = []
+    const lines = section.split(/\n/)
+    for (const line of lines) {
+      const cleaned = line.replace(/^[-\s*]+/, '').replace(/\*\*/g, '').trim()
+      if (cleaned && cleaned.length > 5 && !cleaned.match(/^#{2,}/)) {
+        tips.push(cleaned)
+      }
+    }
+    return tips
   }
 
   const sendMessage = useCallback(async (text) => {
     setIsSending(true)
+    setExecutionStarted(false)
     didDispatchRef.current = false
     taskMapRef.current = {}
 
@@ -246,75 +378,81 @@ export function useLanggraph() {
         setCurrentThreadId(threadId)
       }
 
-      // start SSE stream
+      // start SSE stream — DO NOT await, let events drive UI in real-time
       const handle = streamRun(threadId, text, handleSSEEvent)
       streamHandleRef.current = handle
 
-      // wait for stream to complete
-      await handle.promise
+      // handle stream completion in background
+      handle.promise.then(async () => {
+        // finalize: mark last streaming message as complete
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          if (last && last.isStreaming) {
+            return [...prev.slice(0, -1), { ...last, isStreaming: false }]
+          }
+          return prev
+        })
 
-      // finalize: mark last streaming message as complete
-      setMessages((prev) => {
-        const last = prev[prev.length - 1]
-        if (last && last.isStreaming) {
-          return [...prev.slice(0, -1), { ...last, isStreaming: false }]
-        }
-        return prev
-      })
-
-      // if agents were dispatched, check if they all completed and try to parse results
-      if (didDispatchRef.current) {
-        // get final thread state for the Lead Agent's summary message
-        const state = await getThreadState(threadId)
-        const allMessages = state?.values?.messages || []
-        // find the last AI message (Lead Agent's summary)
-        const lastAi = [...allMessages].reverse().find((m) => m.type === 'ai')
-        if (lastAi) {
-          const content = typeof lastAi.content === 'string'
-            ? lastAi.content
-            : Array.isArray(lastAi.content)
-              ? lastAi.content.map((b) => (typeof b === 'string' ? b : b.text || '')).join('')
-              : ''
-          const parsed = tryParseResults(content)
-          if (parsed) {
-            setResults(parsed)
-          } else {
-            // fallback: store raw text so ResultPanel can render it
-            setResults({ rawText: content })
+        // if agents were dispatched, parse results from final thread state
+        if (didDispatchRef.current) {
+          try {
+            const state = await getThreadState(threadId)
+            const allMessages = state?.values?.messages || []
+            const lastAi = [...allMessages].reverse().find((m) => m.type === 'ai')
+            if (lastAi) {
+              const content = typeof lastAi.content === 'string'
+                ? lastAi.content
+                : Array.isArray(lastAi.content)
+                  ? lastAi.content.map((b) => (typeof b === 'string' ? b : b.text || '')).join('')
+                  : ''
+              const parsed = tryParseResults(content)
+              if (parsed) {
+                setResults(parsed)
+              } else {
+                setResults({ rawText: content })
+              }
+            }
+          } catch {
+            // failed to get thread state, results stay null
           }
         }
-      }
 
-      return { shouldStartSearch: didDispatchRef.current }
+        setIsSending(false)
+        streamHandleRef.current = null
+      }).catch((err) => {
+        if (err.name !== 'AbortError') {
+          setMessages((prev) => [
+            ...prev,
+            { id: `err-${Date.now()}`, role: 'agent', text: 'Sorry, something went wrong. Please try again.', isStreaming: false },
+          ])
+        }
+        setIsSending(false)
+        streamHandleRef.current = null
+      })
+
     } catch (err) {
-      // if aborted by user (stop button), don't show error
-      if (err.name === 'AbortError') {
-        return { shouldStartSearch: false }
-      }
+      // thread creation failed
       setMessages((prev) => [
         ...prev,
-        { id: `err-${Date.now()}`, role: 'agent', text: 'Sorry, something went wrong. Please try again.', isStreaming: false },
+        { id: `err-${Date.now()}`, role: 'agent', text: 'Sorry, could not connect. Please try again.', isStreaming: false },
       ])
-      return { shouldStartSearch: false }
-    } finally {
       setIsSending(false)
-      streamHandleRef.current = null
     }
   }, [currentThreadId])
 
-  const stopExecution = useCallback(async () => {
+  const stopExecution = useCallback(() => {
     // abort the SSE fetch
     if (streamHandleRef.current) {
       streamHandleRef.current.close()
       streamHandleRef.current = null
     }
-    // try to cancel the run on the server
+    // reset execution state so useEffect doesn't re-trigger EXECUTING phase
+    setExecutionStarted(false)
+    setIsSending(false)
+    didDispatchRef.current = false
+    // try to cancel the run on the server (best effort, don't await)
     if (currentThreadId && currentRunIdRef.current) {
-      try {
-        await cancelRun(currentThreadId, currentRunIdRef.current)
-      } catch {
-        // best effort — server may have already finished
-      }
+      cancelRun(currentThreadId, currentRunIdRef.current).catch(() => {})
       currentRunIdRef.current = null
     }
     setAgents(buildIdleAgents())
@@ -326,6 +464,7 @@ export function useLanggraph() {
     setAgents(buildIdleAgents())
     setResults(null)
     setIsSending(false)
+    setExecutionStarted(false)
     taskMapRef.current = {}
     didDispatchRef.current = false
     if (streamHandleRef.current) {
@@ -385,6 +524,7 @@ export function useLanggraph() {
     sessions,
     currentThreadId,
     isSending,
+    executionStarted,
     sendMessage,
     stopExecution,
     newSession,

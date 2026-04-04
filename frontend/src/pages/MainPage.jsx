@@ -44,6 +44,13 @@ function MainPage({ onLogout }) {
     langgraph.loadSessions()
   }, [])
 
+  // transition to executing as soon as first sub-agent starts
+  useEffect(() => {
+    if (langgraph.executionStarted && phase === PHASE.CHAT) {
+      transitionPhase('START_EXECUTION')
+    }
+  }, [langgraph.executionStarted, phase])
+
   // watch agent statuses — when all are done, transition to result phase
   useEffect(() => {
     if (phase !== PHASE.EXECUTING) return
@@ -68,14 +75,12 @@ function MainPage({ onLogout }) {
   }
 
   const handleChatSend = async (text) => {
-    const { shouldStartSearch } = await langgraph.sendMessage(text)
-    if (shouldStartSearch) {
-      transitionPhase('START_EXECUTION')
-    }
+    await langgraph.sendMessage(text)
+    // phase transition is handled by executionStarted useEffect above
   }
 
-  const handleStopAgents = async () => {
-    await langgraph.stopExecution()
+  const handleStopAgents = () => {
+    langgraph.stopExecution()
     transitionPhase('STOP_EXECUTION')
   }
 

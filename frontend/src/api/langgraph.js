@@ -2,6 +2,23 @@
 
 const BASE_URL = import.meta.env.VITE_LANGGRAPH_URL || 'http://localhost:2024'
 
+// cache the assistant_id so we only fetch it once
+let _assistantId = null
+
+async function getAssistantId() {
+  if (_assistantId) return _assistantId
+  const res = await fetch(`${BASE_URL}/assistants/search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ graph_id: 'lead_agent' }),
+  })
+  if (!res.ok) throw new Error(`getAssistantId failed: ${res.status}`)
+  const assistants = await res.json()
+  if (!assistants.length) throw new Error('No lead_agent assistant found')
+  _assistantId = assistants[0].assistant_id
+  return _assistantId
+}
+
 export async function createThread() {
   const res = await fetch(`${BASE_URL}/threads`, {
     method: 'POST',
@@ -41,24 +58,28 @@ export async function cancelRun(threadId, runId) {
 export function streamRun(threadId, message, onEvent) {
   const abortController = new AbortController()
 
-  const body = {
-    input: {
-      messages: [{ role: 'user', content: message }],
-    },
-    config: {
-      configurable: {
-        subagent_enabled: true,
+  const promise = getAssistantId().then(async (assistantId) => {
+    const body = {
+      assistant_id: assistantId,
+      input: {
+        messages: [{ role: 'user', content: message }],
       },
-    },
-    stream_mode: ['values', 'messages-tuple', 'custom'],
-  }
+      config: {
+        configurable: {
+          thread_id: threadId,
+          subagent_enabled: true,
+        },
+      },
+      stream_mode: ['values', 'messages-tuple', 'custom'],
+    }
 
-  const promise = fetch(`${BASE_URL}/threads/${threadId}/runs/stream`, {
+    const res = await fetch(`${BASE_URL}/threads/${threadId}/runs/stream`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: abortController.signal,
-  }).then(async (res) => {
+    })
+
     if (!res.ok) {
       throw new Error(`streamRun failed: ${res.status}`)
     }
@@ -88,7 +109,6 @@ export function streamRun(threadId, message, onEvent) {
             // skip malformed JSON lines
           }
         }
-        // blank lines reset event type per SSE spec
         if (line === '') {
           currentEvent = ''
         }

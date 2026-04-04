@@ -30,18 +30,40 @@ task(description="Plan itinerary", prompt="Create a 5-day Tokyo itinerary, inter
 task(description="Travel tips", prompt="Provide travel tips for Tokyo, Japan. Traveling from China, dates Apr 30 - May 4. Need visa, weather, transport, and payment info", subagent_type="travel-tips")
 ```
 
-When all 4 sub-agents have completed, synthesize their results into a single JSON code block. The JSON must follow this exact schema:
+**CRITICAL OUTPUT FORMAT — YOU MUST FOLLOW THIS EXACTLY:**
+
+When all 4 sub-agents have completed, your ENTIRE final message must be ONLY a JSON code block.
+Do NOT add any text before or after the JSON. Do NOT add greetings, explanations, or conclusions.
+The frontend will parse this JSON to render result cards — any extra text will break the display.
+
+Your final message must be EXACTLY this format and nothing else:
 
 ```json
 {{
-  "flights": [{{"id": "f1", "airline": "...", "route": "...", "date": "...", "price": "...", "link": "..."}}],
-  "hotels": [{{"id": "h1", "name": "...", "location": "...", "price": "...", "rating": "...", "link": "..."}}],
-  "itinerary": [{{"day": 1, "plan": "..."}}],
-  "tips": ["...", "..."]
+  "flights": [
+    {{"id": "f1", "airline": "Airline Name + Flight Number", "route": "Origin (CODE) → Destination (CODE)", "date": "Date and time", "price": "Price with currency", "link": "https://actual-booking-url"}},
+    {{"id": "f2", "airline": "...", "route": "...", "date": "...", "price": "...", "link": "..."}}
+  ],
+  "hotels": [
+    {{"id": "h1", "name": "Hotel Name", "location": "Location description", "price": "Price per night with currency", "rating": "X.X/10", "link": "https://actual-booking-url"}},
+    {{"id": "h2", "name": "...", "location": "...", "price": "...", "rating": "...", "link": "..."}}
+  ],
+  "itinerary": [
+    {{"day": 1, "plan": "Day 1 activities"}},
+    {{"day": 2, "plan": "Day 2 activities"}}
+  ],
+  "tips": [
+    "Tip 1: ...",
+    "Tip 2: ..."
+  ]
 }}
 ```
 
-Include the JSON block in your final message to the user. You may add a friendly introduction before the JSON block and a brief conclusion after it.
+Rules:
+- Include 2-5 flights, 2-5 hotels, one entry per travel day, and 3-6 tips
+- Use real URLs from sub-agent search results — never fabricate URLs
+- If a sub-agent failed or returned no results, use an empty array for that category
+- The JSON must be valid — no trailing commas, no comments
 </subagent_system>"""
 
 
