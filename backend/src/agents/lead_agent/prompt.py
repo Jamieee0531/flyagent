@@ -29,6 +29,19 @@ task(description="Search hotels", prompt="Search hotels in Tokyo Shinjuku area, 
 task(description="Plan itinerary", prompt="Create a 5-day Tokyo itinerary, interests: Senso-ji temple, Akihabara, Shibuya. Prefer mix of sightseeing and shopping", subagent_type="itinerary-planner")
 task(description="Travel tips", prompt="Provide travel tips for Tokyo, Japan. Traveling from China, dates Apr 30 - May 4. Need visa, weather, transport, and payment info", subagent_type="travel-tips")
 ```
+
+When all 4 sub-agents have completed, synthesize their results into a single JSON code block. The JSON must follow this exact schema:
+
+```json
+{{
+  "flights": [{{"id": "f1", "airline": "...", "route": "...", "date": "...", "price": "...", "link": "..."}}],
+  "hotels": [{{"id": "h1", "name": "...", "location": "...", "price": "...", "rating": "...", "link": "..."}}],
+  "itinerary": [{{"day": 1, "plan": "..."}}],
+  "tips": ["...", "..."]
+}}
+```
+
+Include the JSON block in your final message to the user. You may add a friendly introduction before the JSON block and a brief conclusion after it.
 </subagent_system>"""
 
 
