@@ -124,6 +124,7 @@ No other external code was directly copied into this project.
 
 ```bash
 # Start MongoDB + API Gateway together
+cd docker
 docker-compose up --build
 
 # Seed the database with demo users (in a new terminal)
