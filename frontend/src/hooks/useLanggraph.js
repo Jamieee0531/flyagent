@@ -48,6 +48,7 @@ export function useLanggraph() {
   // refs for values that change during streaming but shouldn't trigger re-renders
   const streamHandleRef = useRef(null)
   const currentRunIdRef = useRef(null)
+  const insideThinkingRef = useRef(false) // true while suppressing <thinking>...</thinking>
 
   // extract a short label from an AIMessage dict for the agent steps list
   function extractStepText(message) {
@@ -127,6 +128,32 @@ export function useLanggraph() {
 
     if (!content) return
 
+    // Filter out Claude's <thinking>...</thinking> blocks (streamed across multiple chunks)
+    if (content.includes('<thinking>')) {
+      insideThinkingRef.current = true
+      // Check if thinking also closes in the same chunk
+      if (content.includes('</thinking>')) {
+        insideThinkingRef.current = false
+        // Extract any text after </thinking>
+        const afterThinking = content.split('</thinking>').pop().trim()
+        if (!afterThinking) return
+        // Fall through with only the post-thinking content
+        // (reassign via a variable since const content can't be reassigned)
+      } else {
+        return
+      }
+    }
+    if (insideThinkingRef.current) {
+      if (content.includes('</thinking>')) {
+        insideThinkingRef.current = false
+        const afterThinking = content.split('</thinking>').pop().trim()
+        if (!afterThinking) return
+        // Fall through with post-thinking content handled below
+      } else {
+        return // suppress thinking content
+      }
+    }
+
     setMessages((prev) => {
       const last = prev[prev.length - 1]
       // if last message is a streaming agent message, append to it
@@ -180,9 +207,22 @@ export function useLanggraph() {
       // Parse structured result and render card immediately
       let parsed = null
       try {
-        parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result
+        let raw = typeof data.result === 'string' ? data.result : JSON.stringify(data.result)
+        // Strategy 1: Strip markdown code block wrappers (```json ... ```)
+        const codeBlockMatch = raw.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
+        if (codeBlockMatch) raw = codeBlockMatch[1].trim()
+        try {
+          parsed = JSON.parse(raw)
+        } catch {
+          // Strategy 2: Extract JSON object from text (sub-agent may add text before/after JSON)
+          const braceStart = raw.indexOf('{')
+          const braceEnd = raw.lastIndexOf('}')
+          if (braceStart !== -1 && braceEnd > braceStart) {
+            parsed = JSON.parse(raw.slice(braceStart, braceEnd + 1))
+          }
+        }
       } catch {
-        // JSON parse failed — will show as rawText fallback
+        // JSON parse failed — card won't render for this agent
       }
 
       if (parsed) {
