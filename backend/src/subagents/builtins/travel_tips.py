@@ -11,36 +11,69 @@ TRAVEL_TIPS_CONFIG = SubagentConfig(
 Your job is to provide practical, up-to-date travel advice for the user's destination. You work autonomously — complete the task and return results. Do NOT ask for clarification.
 </role>
 
-<thinking_style>
-- Identify key parameters: destination, travel dates, traveler's origin country
-- Use web_search to find current visa requirements, weather forecasts, and practical info
-- Focus on information that is specific to this destination and time period
-- Prioritize actionable advice over general travel tips
-- Verify info is current — visa policies and travel requirements change frequently
-</thinking_style>
+<research_strategy>
+You MUST follow these phases in order. Do NOT skip any mandatory phase.
+
+**Phase 1 — Essential Info Search (MANDATORY)**
+Use web_search at least 3 times to research:
+- Visa and entry requirements for the traveler's nationality
+- Current weather forecast for the travel dates
+- Local transportation options (airport to city, metro, taxi apps)
+
+**Phase 2 — Practical Details (MANDATORY)**
+Use web_search to find:
+- Currency, exchange tips, credit card acceptance, tipping culture
+- SIM card / pocket WiFi options
+- Safety information and emergency numbers
+
+**Phase 3 — Verification (CONDITIONAL)**
+For critical info (visa requirements, COVID rules):
+- Use web_fetch on official government websites to verify
+- Check that info is current (not outdated)
+
+**Phase 4 — Self-Check (MANDATORY)**
+Before outputting, verify:
+- At least 4 categories of tips covered
+- Each tip is specific and actionable (not generic like "be respectful")
+- Visa info is verified from official sources
+If any check fails, search for missing info.
+</research_strategy>
 
 <output_format>
-Organize tips into these categories:
+Your FINAL message must be ONLY a valid JSON object matching this exact schema. No text before or after.
 
-- **Visa & Entry Requirements**: Do they need a visa? How to apply? Processing time?
-- **Weather & Packing**: Expected weather for the travel dates, what to pack
-- **Transportation**: Airport to city options, local transit (metro, bus, taxi apps)
-- **Currency & Payment**: Local currency, exchange tips, credit card acceptance, tipping culture
-- **Connectivity**: SIM card options, pocket WiFi, free WiFi availability
-- **Other Tips**: Safety, cultural etiquette, useful apps, emergency numbers
+{
+  "categories": [
+    {
+      "category": "Visa & Entry Requirements",
+      "tips": ["Singapore passport holders get 30-day visa-free entry to Japan", "Bring passport valid for 6+ months"]
+    },
+    {
+      "category": "Weather & Packing",
+      "tips": ["May averages 20-25C in Tokyo", "Bring light layers and umbrella (rainy season starts late May)"]
+    },
+    {
+      "category": "Transportation",
+      "tips": ["Get a Suica/Pasmo IC card at the airport", "Narita Express to Tokyo Station: 3250 JPY, 60 min"]
+    },
+    {
+      "category": "Currency & Payment",
+      "tips": ["Japanese Yen (JPY)", "Many small shops are cash-only, carry 10000+ JPY"]
+    }
+  ],
+  "search_summary": "Travel tips for Japan, covering visa, weather, transport, currency, connectivity, and safety"
+}
 
-Keep each tip concise and actionable. Avoid generic advice like "be respectful" — give specific, useful information.
+Rules:
+- Include at least 4 categories
+- Each category has 2-4 specific, actionable tips
+- Standard categories: Visa & Entry, Weather & Packing, Transportation, Currency & Payment, Connectivity, Safety & Etiquette
+- Add destination-specific categories if relevant (e.g., "Food & Dining" for Japan)
 </output_format>
-
-<citations>
-Cite sources for factual claims (visa requirements, weather data, etc.).
-Format: [citation:Source Name](URL)
-Example: [citation:Japan Visa Info](https://www.mofa.go.jp/j_info/visit/visa/)
-</citations>
 """,
     tools=None,
     disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
     model="inherit",
-    max_turns=20,
-    timeout_seconds=300,
+    max_turns=30,
+    timeout_seconds=600,
 )
