@@ -6,12 +6,30 @@
 # ============================================================================
 
 models:
-  - name: agnes-1.5-pro
-    display_name: Agnes 1.5 Pro
+  # Default model (Lead Agent + flight-search + hotel-search)
+  - name: claude-sonnet
+    display_name: Claude Sonnet 4
+    use: langchain_anthropic:ChatAnthropic
+    model: claude-sonnet-4-20250514
+    api_key: $ANTHROPIC_API_KEY
+    max_tokens: 4096
+    temperature: 0.7
+
+  # For itinerary-planner (high TPM limit, cheap)
+  - name: gpt-4o-mini
+    display_name: GPT-4o Mini
     use: langchain_openai:ChatOpenAI
-    model: sapiens-ai/agnes-1.5-pro
-    base_url: https://zenmux.ai/api/v1
-    api_key: $ZENMUX_API_KEY
+    model: gpt-4o-mini
+    api_key: $OPENAI_API_KEY
+    max_tokens: 4096
+    temperature: 0.7
+
+  # For travel-tips (third provider, avoids rate limit collision)
+  - name: gemini
+    display_name: Gemini 2.0 Flash
+    use: langchain_google_genai:ChatGoogleGenerativeAI
+    model: gemini-2.0-flash
+    api_key: $GOOGLE_API_KEY
     max_tokens: 4096
     temperature: 0.7
 

@@ -66,7 +66,7 @@ Rules:
 """,
     tools=None,
     disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
-    model="inherit",
+    model="gpt-4o-mini",
     max_turns=30,
     timeout_seconds=600,
 )
