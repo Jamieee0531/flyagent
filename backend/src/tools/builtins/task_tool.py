@@ -111,14 +111,14 @@ def task_tool(
 
     writer = get_stream_writer()
     # Send Task Started message'
-    writer({"type": "task_started", "task_id": task_id, "description": description})
+    writer({"type": "task_started", "task_id": task_id, "description": description, "subagent_type": subagent_type})
 
     while True:
         result = get_background_task_result(task_id)
 
         if result is None:
             logger.error(f"[trace={trace_id}] Task {task_id} not found in background tasks")
-            writer({"type": "task_failed", "task_id": task_id, "error": "Task disappeared from background tasks"})
+            writer({"type": "task_failed", "task_id": task_id, "error": "Task disappeared from background tasks", "subagent_type": subagent_type})
             cleanup_background_task(task_id)
             return f"Error: Task {task_id} disappeared from background tasks"
 
@@ -138,8 +138,9 @@ def task_tool(
                         "type": "task_running",
                         "task_id": task_id,
                         "message": message,
-                        "message_index": i + 1,  # 1-based index for display
+                        "message_index": i + 1,
                         "total_messages": current_message_count,
+                        "subagent_type": subagent_type,
                     }
                 )
                 logger.info(f"[trace={trace_id}] Task {task_id} sent message #{i + 1}/{current_message_count}")
@@ -147,17 +148,17 @@ def task_tool(
 
         # Check if task completed, failed, or timed out
         if result.status == SubagentStatus.COMPLETED:
-            writer({"type": "task_completed", "task_id": task_id, "result": result.result})
+            writer({"type": "task_completed", "task_id": task_id, "result": result.result, "subagent_type": subagent_type})
             logger.info(f"[trace={trace_id}] Task {task_id} completed after {poll_count} polls")
             cleanup_background_task(task_id)
             return f"Task Succeeded. Result: {result.result}"
         elif result.status == SubagentStatus.FAILED:
-            writer({"type": "task_failed", "task_id": task_id, "error": result.error})
+            writer({"type": "task_failed", "task_id": task_id, "error": result.error, "subagent_type": subagent_type})
             logger.error(f"[trace={trace_id}] Task {task_id} failed: {result.error}")
             cleanup_background_task(task_id)
             return f"Task failed. Error: {result.error}"
         elif result.status == SubagentStatus.TIMED_OUT:
-            writer({"type": "task_timed_out", "task_id": task_id, "error": result.error})
+            writer({"type": "task_timed_out", "task_id": task_id, "error": result.error, "subagent_type": subagent_type})
             logger.warning(f"[trace={trace_id}] Task {task_id} timed out: {result.error}")
             cleanup_background_task(task_id)
             return f"Task timed out. Error: {result.error}"
@@ -175,5 +176,5 @@ def task_tool(
         if poll_count > max_poll_count:
             timeout_minutes = config.timeout_seconds // 60
             logger.error(f"[trace={trace_id}] Task {task_id} polling timed out after {poll_count} polls (should have been caught by thread pool timeout)")
-            writer({"type": "task_timed_out", "task_id": task_id})
+            writer({"type": "task_timed_out", "task_id": task_id, "subagent_type": subagent_type})
             return f"Task polling timed out after {timeout_minutes} minutes. This may indicate the background task is stuck. Status: {result.status.value}"

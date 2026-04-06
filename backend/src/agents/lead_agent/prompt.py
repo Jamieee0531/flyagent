@@ -11,59 +11,80 @@ You have 4 specialized travel sub-agents. When the user confirms they want to st
 dispatch ALL 4 sub-agents in parallel using the `task` tool.
 
 **Available Sub-agents:**
-- **flight-search**: Search and compare flights across multiple platforms
-- **hotel-search**: Search and compare hotels and accommodations
+- **flight-search**: Search and compare flights using Duffel API + web search
+- **hotel-search**: Search and compare hotels using LiteAPI + web search
 - **itinerary-planner**: Generate a day-by-day travel itinerary
 - **travel-tips**: Provide practical travel tips and destination advice
 
 **Dispatch Rules:**
 - When the user says "start search", "go search", "开始搜索", or similar, dispatch all 4 sub-agents
-- Each task() call must include ALL relevant travel details in the prompt (destination, dates, travelers, budget, preferences)
+- Each task() call MUST include ALL relevant travel details using the structured format shown below
 - Maximum {max_concurrent} task() calls per response
-- After all sub-agents return, synthesize their results into a clear summary for the user
+- After all sub-agents return, tell the user the search is complete in natural language
+- The results are displayed automatically in the result panel — you do NOT need to repeat or summarize the search data
+- Just let the user know the search is done and ask if they want to adjust anything
 
-**Example dispatch:**
+**IMPORTANT: Structured Dispatch Format**
+You MUST use this format when dispatching. Include ALL information the user has provided.
+
 ```python
-task(description="Search flights", prompt="Search flights from Shanghai to Tokyo, Apr 30 - May 4, 2 passengers, budget under 3000 CNY per person", subagent_type="flight-search")
-task(description="Search hotels", prompt="Search hotels in Tokyo Shinjuku area, check-in Apr 30 check-out May 4, 2 guests, budget under 500 CNY per night, prefer convenient transit access", subagent_type="hotel-search")
-task(description="Plan itinerary", prompt="Create a 5-day Tokyo itinerary, interests: Senso-ji temple, Akihabara, Shibuya. Prefer mix of sightseeing and shopping", subagent_type="itinerary-planner")
-task(description="Travel tips", prompt="Provide travel tips for Tokyo, Japan. Traveling from China, dates Apr 30 - May 4. Need visa, weather, transport, and payment info", subagent_type="travel-tips")
+task(
+    description="Search flights",
+    prompt=\"\"\"Search flights with these requirements:
+- Origin: SIN (Singapore)
+- Destination: NRT (Tokyo Narita)
+- Departure: 2026-04-30
+- Return: 2026-05-04 (one-way if not specified)
+- Passengers: 2
+- Cabin: economy
+- Budget: under $500 per person (or "no limit" if not specified)
+- Preferences: direct flights preferred, no red-eye
+- Sort by: price\"\"\",
+    subagent_type="flight-search"
+)
+
+task(
+    description="Search hotels",
+    prompt=\"\"\"Search hotels with these requirements:
+- City: Tokyo
+- Country: JP
+- Check-in: 2026-04-30
+- Check-out: 2026-05-04
+- Guests: 2
+- Rooms: 1
+- Budget: under $150 per night (or "no limit" if not specified)
+- Preferences: near Shinjuku station, good transit access
+- Sort by: value (price + rating + location)\"\"\",
+    subagent_type="hotel-search"
+)
+
+task(
+    description="Plan itinerary",
+    prompt=\"\"\"Create a travel itinerary:
+- Destination: Tokyo, Japan
+- Duration: 5 days (Apr 30 - May 4)
+- Interests: Senso-ji temple, Akihabara, Shibuya
+- Travel style: mix of sightseeing and shopping
+- Travelers: 2 adults\"\"\",
+    subagent_type="itinerary-planner"
+)
+
+task(
+    description="Travel tips",
+    prompt=\"\"\"Provide travel tips:
+- Destination: Tokyo, Japan
+- Traveler origin: Singapore
+- Dates: Apr 30 - May 4, 2026
+- Topics needed: visa, weather, transport, currency, connectivity, safety\"\"\",
+    subagent_type="travel-tips"
+)
 ```
 
-**CRITICAL OUTPUT FORMAT — YOU MUST FOLLOW THIS EXACTLY:**
-
-When all 4 sub-agents have completed, your ENTIRE final message must be ONLY a JSON code block.
-Do NOT add any text before or after the JSON. Do NOT add greetings, explanations, or conclusions.
-The frontend will parse this JSON to render result cards — any extra text will break the display.
-
-Your final message must be EXACTLY this format and nothing else:
-
-```json
-{{
-  "flights": [
-    {{"id": "f1", "airline": "Airline Name + Flight Number", "route": "Origin (CODE) → Destination (CODE)", "date": "Date and time", "price": "Price with currency", "link": "https://actual-booking-url"}},
-    {{"id": "f2", "airline": "...", "route": "...", "date": "...", "price": "...", "link": "..."}}
-  ],
-  "hotels": [
-    {{"id": "h1", "name": "Hotel Name", "location": "Location description", "price": "Price per night with currency", "rating": "X.X/10", "link": "https://actual-booking-url"}},
-    {{"id": "h2", "name": "...", "location": "...", "price": "...", "rating": "...", "link": "..."}}
-  ],
-  "itinerary": [
-    {{"day": 1, "plan": "Day 1 activities"}},
-    {{"day": 2, "plan": "Day 2 activities"}}
-  ],
-  "tips": [
-    "Tip 1: ...",
-    "Tip 2: ..."
-  ]
-}}
-```
-
-Rules:
-- Include 2-5 flights, 2-5 hotels, one entry per travel day, and 3-6 tips
-- Use real URLs from sub-agent search results — never fabricate URLs
-- If a sub-agent failed or returned no results, use an empty array for that category
-- The JSON must be valid — no trailing commas, no comments
+**Key rules for dispatch prompts:**
+- ALWAYS include origin, destination, dates, and passenger count for flights
+- ALWAYS include city, country code, dates, and guest count for hotels
+- ALWAYS pass along user preferences (budget, style, must-see places)
+- If user didn't specify something (e.g., budget), write "no limit" or "not specified" — do NOT omit the field
 </subagent_system>"""
 
 
