@@ -129,30 +129,26 @@ export function useLanggraph() {
     if (!content) return
 
     // Filter out Claude's <thinking>...</thinking> blocks (streamed across multiple chunks)
-    if (content.includes('<thinking>')) {
+    let visibleContent = content
+
+    if (visibleContent.includes('<thinking>')) {
       insideThinkingRef.current = true
-      // Check if thinking also closes in the same chunk
-      if (content.includes('</thinking>')) {
-        insideThinkingRef.current = false
-        // Extract any text after </thinking>
-        const afterThinking = content.split('</thinking>').pop().trim()
-        if (!afterThinking) return
-        // Fall through with only the post-thinking content
-        // (reassign via a variable since const content can't be reassigned)
-      } else {
-        return
-      }
     }
+
     if (insideThinkingRef.current) {
-      if (content.includes('</thinking>')) {
+      if (visibleContent.includes('</thinking>')) {
         insideThinkingRef.current = false
-        const afterThinking = content.split('</thinking>').pop().trim()
-        if (!afterThinking) return
-        // Fall through with post-thinking content handled below
+        // Keep only text AFTER </thinking>
+        visibleContent = visibleContent.split('</thinking>').pop().trim()
       } else {
-        return // suppress thinking content
+        return // entirely inside thinking block, suppress
       }
     }
+
+    // Also strip any leftover <thinking> or </thinking> fragments
+    visibleContent = visibleContent.replace(/<\/?thinking>/g, '').trim()
+
+    if (!visibleContent) return
 
     setMessages((prev) => {
       const last = prev[prev.length - 1]
@@ -160,13 +156,13 @@ export function useLanggraph() {
       if (last && last.role === 'agent' && last.isStreaming) {
         return [
           ...prev.slice(0, -1),
-          { ...last, text: last.text + content },
+          { ...last, text: last.text + visibleContent },
         ]
       }
       // otherwise start a new streaming message
       return [
         ...prev,
-        { id: `msg-${Date.now()}`, role: 'agent', text: content, isStreaming: true },
+        { id: `msg-${Date.now()}`, role: 'agent', text: visibleContent, isStreaming: true },
       ]
     })
   }
