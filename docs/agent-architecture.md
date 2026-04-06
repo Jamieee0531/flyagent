@@ -83,13 +83,13 @@
 
 | Tool | 保留 | 说明 |
 |------|------|------|
-| task() | ✅ | 派发 sub-agent，唯一核心 tool |
-| web_search | ❌ | 搜索由 sub-agent 负责 |
-| web_fetch | ❌ | 搜索由 sub-agent 负责 |
-| sandbox tools | ❌ | 不需要执行代码 |
+| task() | ✅ | 派发 sub-agent，核心 tool |
 | ask_clarification | ✅ | 聊天阶段问用户 |
-| present_files | ❌ | 暂不需要 |
 | view_image | ✅ | 看用户上传的图片 |
+| web_fetch | ✅ | 读取用户发的链接 |
+| web_search | ❌ | 搜索由 sub-agent 负责 |
+| sandbox tools | ❌ | 不需要执行代码 |
+| present_files | ❌ | 暂不需要 |
 
 ### 与 Sub-agent 的接口
 
@@ -119,27 +119,16 @@ Sub-agent 返回自然语言文本，Lead Agent 自行汇总。
 
 ### Sub-agent 的 System Prompt 结构
 
+每个 sub-agent 只包含 4 个模块：
+
 ```
-<role>              专业身份（如"机票搜索专家"）
+<role>              专业身份 + "自主工作，不要问用户问题"
 <thinking_style>    搜索/分析策略
-<skill_system>      专属 skill（如果有）
-<working_directory> 文件路径
-<response_style>    输出要包含哪些信息字段
+<output_format>     返回哪些信息字段
 <citations>         标注数据来源
-<critical_reminders> 注意事项
 ```
 
-去掉的部分：memory（短期任务不需要）、clarification_system（不能问用户）、subagent_system（不能派子任务）。
-
-### Sub-agent Prompt Structure (all 4 share this structure)
-
-Each sub-agent prompt contains only:
-- `<role>` — specialist identity + "work autonomously, do NOT ask for clarification"
-- `<thinking_style>` — search/analysis strategy specific to this agent's domain
-- `<output_format>` — exact fields to return
-- `<citations>` — cite data sources
-
-Modules NOT included in sub-agents: memory, clarification_system, subagent_system, response_style, working_directory, skill_system
+不包含的模块：memory、clarification_system、subagent_system、response_style、working_directory、skill_system
 
 ### Sub-agent Middleware
 
@@ -195,9 +184,11 @@ Modules NOT included in sub-agents: memory, clarification_system, subagent_syste
 
 ### Sub-agent Tools
 
-每个 sub-agent 的具体 tools 待定。大方向：
-- Flight Agent 和 Hotel Agent 需要搜索类工具（具体用什么待定）
-- Itinerary Agent 和 Tips Agent 可能只需要 web_search
+所有 4 个 sub-agent 共享相同的 tools（继承自 Lead Agent，不做限制），主要使用：
+- `web_search`（Tavily）— 搜索航班、酒店、景点、签证等信息
+- `web_fetch`（Jina AI）— 抓取具体网页获取详细信息
+
+每个 sub-agent 通过 system prompt 来区分职责，不通过限制 tools。
 
 ---
 
