@@ -1,7 +1,5 @@
 import './ResultPanel.css'
 
-// shows search results: flights, hotels, itinerary, and travel tips
-// each flight/hotel card has a save-to-favorites button
 function ResultPanel({ results, favorites, onToggleFavorite }) {
   const isFavorited = (id) => favorites.some(f => f.id === id)
 
@@ -10,7 +8,7 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
     return (
       <div className="result-panel">
         <div className="result-header">
-          <h3>🎉 Search Complete!</h3>
+          <h3>Search Complete!</h3>
         </div>
         <section className="result-section">
           <div className="raw-result-text">{results.rawText}</div>
@@ -19,46 +17,53 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
     )
   }
 
+  const hasAnyData = (results.flights?.length > 0) || (results.hotels?.length > 0) ||
+                     (results.itinerary?.length > 0) || (results.tips?.length > 0)
+
   return (
     <div className="result-panel">
       <div className="result-header">
-        <h3>🎉 Search Complete!</h3>
-        <p>Here are the recommended options for you</p>
+        <h3>{hasAnyData ? 'Search Results' : 'Searching...'}</h3>
+        {hasAnyData && <p>Results appear as each agent completes</p>}
       </div>
 
       {/* Flights */}
       {results.flights && results.flights.length > 0 && (
         <section className="result-section">
-          <h4>✈️ Flights</h4>
+          <h4>Flights</h4>
           <div className="result-cards">
-            {results.flights.map((flight, i) => (
-              <div key={flight.id || `f-${i}`} className="result-card">
-                <div className="card-main">
-                  <div className="card-title">{flight.airline}</div>
-                  <div className="card-detail">{flight.route}</div>
-                  <div className="card-detail">{flight.date}</div>
-                  <div className="card-price">{flight.price}</div>
+            {results.flights.map((flight, i) => {
+              const id = `f-${i}`
+              return (
+                <div key={id} className="result-card">
+                  <div className="card-main">
+                    <div className="card-title">{flight.airline} {flight.flight_number}</div>
+                    <div className="card-detail">{flight.origin} → {flight.destination}</div>
+                    <div className="card-detail">{flight.departure_time} - {flight.arrival_time}</div>
+                    <div className="card-price">{flight.price} {flight.currency}</div>
+                    {flight.source && <div className="card-source">via {flight.source}</div>}
+                  </div>
+                  <div className="card-actions">
+                    {flight.booking_link && (
+                      <a href={flight.booking_link} className="action-link" target="_blank" rel="noreferrer">
+                        Book →
+                      </a>
+                    )}
+                    <button
+                      className={`fav-btn ${isFavorited(id) ? 'active' : ''}`}
+                      onClick={() => onToggleFavorite({
+                        id,
+                        type: 'flight',
+                        title: `${flight.airline} ${flight.flight_number}`,
+                        price: flight.price,
+                      })}
+                    >
+                      {isFavorited(id) ? 'Saved' : 'Save'}
+                    </button>
+                  </div>
                 </div>
-                <div className="card-actions">
-                  {flight.link && (
-                    <a href={flight.link} className="action-link" target="_blank" rel="noreferrer">
-                      View →
-                    </a>
-                  )}
-                  <button
-                    className={`fav-btn ${isFavorited(flight.id) ? 'active' : ''}`}
-                    onClick={() => onToggleFavorite({
-                      id: flight.id || `f-${i}`,
-                      type: 'flight',
-                      title: flight.airline,
-                      price: flight.price,
-                    })}
-                  >
-                    {isFavorited(flight.id) ? '⭐' : '☆'} Save
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}
@@ -66,35 +71,40 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
       {/* Hotels */}
       {results.hotels && results.hotels.length > 0 && (
         <section className="result-section">
-          <h4>🏨 Hotels</h4>
+          <h4>Hotels</h4>
           <div className="result-cards">
-            {results.hotels.map((hotel, i) => (
-              <div key={hotel.id || `h-${i}`} className="result-card">
-                <div className="card-main">
-                  <div className="card-title">{hotel.name}</div>
-                  <div className="card-detail">{hotel.location}</div>
-                  <div className="card-price">{hotel.price}</div>
+            {results.hotels.map((hotel, i) => {
+              const id = `h-${i}`
+              return (
+                <div key={id} className="result-card">
+                  <div className="card-main">
+                    <div className="card-title">{hotel.name}</div>
+                    <div className="card-detail">{hotel.location}</div>
+                    <div className="card-price">{hotel.price_per_night}/night {hotel.currency}</div>
+                    {hotel.rating && <div className="card-detail">Rating: {hotel.rating}</div>}
+                    {hotel.source && <div className="card-source">via {hotel.source}</div>}
+                  </div>
+                  <div className="card-actions">
+                    {hotel.booking_link && (
+                      <a href={hotel.booking_link} className="action-link" target="_blank" rel="noreferrer">
+                        Book →
+                      </a>
+                    )}
+                    <button
+                      className={`fav-btn ${isFavorited(id) ? 'active' : ''}`}
+                      onClick={() => onToggleFavorite({
+                        id,
+                        type: 'hotel',
+                        title: hotel.name,
+                        price: hotel.price_per_night,
+                      })}
+                    >
+                      {isFavorited(id) ? 'Saved' : 'Save'}
+                    </button>
+                  </div>
                 </div>
-                <div className="card-actions">
-                  {hotel.link && (
-                    <a href={hotel.link} className="action-link" target="_blank" rel="noreferrer">
-                      View →
-                    </a>
-                  )}
-                  <button
-                    className={`fav-btn ${isFavorited(hotel.id) ? 'active' : ''}`}
-                    onClick={() => onToggleFavorite({
-                      id: hotel.id || `h-${i}`,
-                      type: 'hotel',
-                      title: hotel.name,
-                      price: hotel.price,
-                    })}
-                  >
-                    {isFavorited(hotel.id) ? '⭐' : '☆'} Save
-                  </button>
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       )}
@@ -102,12 +112,22 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
       {/* Itinerary */}
       {results.itinerary && results.itinerary.length > 0 && (
         <section className="result-section">
-          <h4>📋 Itinerary</h4>
+          <h4>Itinerary</h4>
           <div className="itinerary-list">
             {results.itinerary.map((item, i) => (
               <div key={item.day || i} className="itinerary-item">
-                <span className="day-badge">Day {item.day}</span>
-                <span className="day-plan">{item.plan}</span>
+                <div className="day-header">
+                  <span className="day-badge">Day {item.day}</span>
+                  <span className="day-theme">{item.theme}</span>
+                </div>
+                <div className="day-schedule">
+                  <div><strong>Morning:</strong> {item.morning}</div>
+                  <div><strong>Afternoon:</strong> {item.afternoon}</div>
+                  <div><strong>Evening:</strong> {item.evening}</div>
+                  {item.transport_notes && (
+                    <div className="transport-note">Transport: {item.transport_notes}</div>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -117,12 +137,17 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
       {/* Tips */}
       {results.tips && results.tips.length > 0 && (
         <section className="result-section">
-          <h4>⚠️ Travel Tips</h4>
-          <ul className="tips-list">
-            {results.tips.map((tip, i) => (
-              <li key={i}>{tip}</li>
-            ))}
-          </ul>
+          <h4>Travel Tips</h4>
+          {results.tips.map((cat, i) => (
+            <div key={i} className="tip-category">
+              <h5>{cat.category}</h5>
+              <ul className="tips-list">
+                {cat.tips.map((tip, j) => (
+                  <li key={j}>{tip}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </section>
       )}
     </div>

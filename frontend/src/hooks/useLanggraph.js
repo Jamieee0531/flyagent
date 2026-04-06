@@ -48,7 +48,6 @@ export function useLanggraph() {
   // refs for values that change during streaming but shouldn't trigger re-renders
   const streamHandleRef = useRef(null)
   const currentRunIdRef = useRef(null)
-  const taskMapRef = useRef({}) // tool_call_id -> panel agent id
 
   // extract a short label from an AIMessage dict for the agent steps list
   function extractStepText(message) {
@@ -63,6 +62,12 @@ export function useLanggraph() {
       if (toolName === 'web_fetch') {
         const url = args.url || ''
         return url ? `Fetching: ${url.slice(0, 60)}` : 'Fetching a page...'
+      }
+      if (toolName === 'duffel_flight_search') {
+        return `Searching Duffel: ${args.origin || ''} → ${args.destination || ''}`
+      }
+      if (toolName === 'liteapi_hotel_search') {
+        return `Searching LiteAPI: ${args.city_code || ''}`
       }
       return `Using ${toolName}...`
     }
@@ -139,29 +144,11 @@ export function useLanggraph() {
     })
   }
 
-  // infer panel agent id from task_started description
-  function inferPanelId(description) {
-    const desc = (description || '').toLowerCase()
-    if (desc.includes('flight')) return 'flight'
-    if (desc.includes('hotel') || desc.includes('accommodation')) return 'hotel'
-    if (desc.includes('itinerary') || desc.includes('plan')) return 'itinerary'
-    if (desc.includes('tip') || desc.includes('advice') || desc.includes('travel')) return 'tips'
-    return null
-  }
-
   function handleCustomEvent(data) {
     if (!data || !data.type) return
-    const taskId = data.task_id
 
-    // on task_started, build the task_id -> panel_id mapping from description
-    if (data.type === 'task_started') {
-      const panelId = inferPanelId(data.description)
-      if (panelId) {
-        taskMapRef.current[taskId] = panelId
-      }
-    }
-
-    const panelId = taskMapRef.current[taskId]
+    // Use subagent_type from SSE event to map to panel
+    const panelId = data.subagent_type ? SUBAGENT_TO_PANEL_ID[data.subagent_type] : null
     if (!panelId) return
 
     if (data.type === 'task_started') {
@@ -179,7 +166,6 @@ export function useLanggraph() {
       setAgents((prev) =>
         prev.map((a) => {
           if (a.id !== panelId) return a
-          // flip previous working steps to done, add new working step
           const updatedSteps = a.steps.map((s) =>
             s.status === 'working' ? { ...s, status: 'done' } : s
           )
@@ -191,6 +177,25 @@ export function useLanggraph() {
         })
       )
     } else if (data.type === 'task_completed') {
+      // Parse structured result and render card immediately
+      let parsed = null
+      try {
+        parsed = typeof data.result === 'string' ? JSON.parse(data.result) : data.result
+      } catch {
+        // JSON parse failed — will show as rawText fallback
+      }
+
+      if (parsed) {
+        setResults((prev) => {
+          const base = prev || {}
+          if (panelId === 'flight') return { ...base, flights: parsed.flights || [] }
+          if (panelId === 'hotel') return { ...base, hotels: parsed.hotels || [] }
+          if (panelId === 'itinerary') return { ...base, itinerary: parsed.days || [] }
+          if (panelId === 'tips') return { ...base, tips: parsed.categories || [] }
+          return base
+        })
+      }
+
       setAgents((prev) =>
         prev.map((a) =>
           a.id === panelId
@@ -221,147 +226,10 @@ export function useLanggraph() {
     }
   }
 
-  function tryParseResults(text) {
-    // 1. try JSON code block
-    const jsonBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)```/)
-    if (jsonBlockMatch) {
-      try { return JSON.parse(jsonBlockMatch[1].trim()) } catch { /* fall through */ }
-    }
-    // 2. try raw JSON object
-    const braceStart = text.indexOf('{')
-    const braceEnd = text.lastIndexOf('}')
-    if (braceStart !== -1 && braceEnd > braceStart) {
-      try { return JSON.parse(text.slice(braceStart, braceEnd + 1)) } catch { /* fall through */ }
-    }
-    // 3. parse markdown structure from Lead Agent's natural language output
-    return parseMarkdownResults(text)
-  }
-
-  function parseMarkdownResults(text) {
-    const results = { flights: [], hotels: [], itinerary: [], tips: [] }
-
-    // split by ### or ## headers
-    const sections = text.split(/#{2,3}\s+/)
-
-    for (const section of sections) {
-      const lower = section.toLowerCase()
-      if (lower.startsWith('航班') || lower.startsWith('flight')) {
-        results.flights = parseFlights(section)
-      } else if (lower.startsWith('酒店') || lower.startsWith('hotel') || lower.startsWith('accommodation')) {
-        results.hotels = parseHotels(section)
-      } else if (lower.startsWith('行程') || lower.startsWith('itinerary') || lower.startsWith('day')) {
-        results.itinerary = parseItinerary(section)
-      } else if (lower.startsWith('旅行') || lower.startsWith('travel') || lower.startsWith('tip') || lower.startsWith('注意')) {
-        results.tips = parseTips(section)
-      }
-    }
-
-    // if we found at least some data, return structured results
-    const hasData = results.flights.length > 0 || results.hotels.length > 0 ||
-                    results.itinerary.length > 0 || results.tips.length > 0
-    return hasData ? results : null
-  }
-
-  function extractLink(text) {
-    const match = text.match(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/)
-    if (match) return match[2]
-    const urlMatch = text.match(/(https?:\/\/[^\s)]+)/)
-    return urlMatch ? urlMatch[1] : ''
-  }
-
-  function parseFlights(section) {
-    // split by numbered items: "1." "2." etc.
-    const items = section.split(/\n\s*\d+\.\s+/).filter(Boolean)
-    return items.map((item, i) => {
-      const lines = item.replace(/\n/g, ' ')
-      // extract airline name from first bold text
-      const airlineMatch = lines.match(/\*\*([^*]+)\*\*/)
-      const airline = airlineMatch ? airlineMatch[1].replace(/航班\s*/, '') : `Flight ${i + 1}`
-      // extract route
-      const routeMatch = lines.match(/航线\*?\*?[:：]\s*([^-–\n]*(?:→|->|to)[^-–\n]*)/) ||
-                         lines.match(/([A-Z]{3}\s*(?:→|->|to)\s*[A-Z]{3})/) ||
-                         lines.match(/route\*?\*?[:：]\s*([^-–\n]*)/i)
-      const route = routeMatch ? routeMatch[1].trim().replace(/\*\*/g, '') : ''
-      // extract date
-      const dateMatch = lines.match(/日期[^:：]*[:：]\s*([^-–]*?)(?=\s*-\s*\*|$)/) ||
-                       lines.match(/date[^:：]*[:：]\s*([^-–]*?)(?=\s*-\s*\*|$)/i) ||
-                       lines.match(/出发[^:：]*[:：]\s*([^-–]*?)(?=\s*-\s*\*|$)/)
-      const date = dateMatch ? dateMatch[1].trim().replace(/\*\*/g, '').slice(0, 60) : ''
-      // extract price
-      const priceMatch = lines.match(/价格\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
-                        lines.match(/price\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i) ||
-                        lines.match(/([\$¥€]\s*[\d,]+[^-–\n]*?)(?=\s*-\s*\*|$)/) ||
-                        lines.match(/(\d+\s*(?:SGD|CNY|USD|RMB|新加坡元|人民币)[^-–\n]*?)(?=\s*-\s*\*|$)/)
-      const price = priceMatch ? priceMatch[1].trim().replace(/\*\*/g, '') : ''
-      const link = extractLink(lines)
-      return { id: `f${i + 1}`, airline, route, date, price, link }
-    }).filter((f) => f.airline !== `Flight 0`)
-  }
-
-  function parseHotels(section) {
-    const items = section.split(/\n\s*\d+\.\s+/).filter(Boolean)
-    return items.map((item, i) => {
-      const lines = item.replace(/\n/g, ' ')
-      const nameMatch = lines.match(/\*\*([^*]+)\*\*/)
-      const name = nameMatch ? nameMatch[1] : `Hotel ${i + 1}`
-      const locationMatch = lines.match(/位置\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
-                           lines.match(/location\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i)
-      const location = locationMatch ? locationMatch[1].trim().replace(/\*\*/g, '') : ''
-      const priceMatch = lines.match(/价格\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
-                        lines.match(/price\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i)
-      const price = priceMatch ? priceMatch[1].trim().replace(/\*\*/g, '') : ''
-      const ratingMatch = lines.match(/评[分级]\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/) ||
-                         lines.match(/rating\*?\*?[:：]\s*([^-–\n]*?)(?=\s*-\s*\*|$)/i)
-      const rating = ratingMatch ? ratingMatch[1].trim().replace(/\*\*/g, '') : ''
-      const link = extractLink(lines)
-      return { id: `h${i + 1}`, name, location, price, rating, link }
-    }).filter((h) => h.name !== 'Hotel 0')
-  }
-
-  function parseItinerary(section) {
-    const days = []
-    // match patterns like "第1天" "Day 1" "**第1天**"
-    const dayPattern = /(?:\*\*)?(?:第(\d+)天|Day\s*(\d+))(?:\*\*)?[:：]?\s*(.*?)(?=(?:\*\*)?(?:第\d+天|Day\s*\d+)|\s*$)/gi
-    let match
-    while ((match = dayPattern.exec(section)) !== null) {
-      const dayNum = parseInt(match[1] || match[2])
-      const plan = match[3].trim().replace(/\*\*/g, '').replace(/^[-–]\s*/, '')
-      if (plan) days.push({ day: dayNum, plan })
-    }
-    // fallback: split by "- **第X天**" pattern
-    if (days.length === 0) {
-      const lines = section.split(/\n/).filter((l) => l.trim())
-      let dayNum = 1
-      for (const line of lines) {
-        const cleaned = line.replace(/^[-\s*]+/, '').replace(/\*\*/g, '').trim()
-        if (cleaned && cleaned.length > 5) {
-          const numMatch = cleaned.match(/^第?(\d+)[天日]/)
-          if (numMatch) dayNum = parseInt(numMatch[1])
-          const plan = cleaned.replace(/^第?\d+[天日][：:]?\s*/, '')
-          if (plan) days.push({ day: dayNum++, plan })
-        }
-      }
-    }
-    return days
-  }
-
-  function parseTips(section) {
-    const tips = []
-    const lines = section.split(/\n/)
-    for (const line of lines) {
-      const cleaned = line.replace(/^[-\s*]+/, '').replace(/\*\*/g, '').trim()
-      if (cleaned && cleaned.length > 5 && !cleaned.match(/^#{2,}/)) {
-        tips.push(cleaned)
-      }
-    }
-    return tips
-  }
-
   const sendMessage = useCallback(async (text) => {
     setIsSending(true)
     setExecutionStarted(false)
     didDispatchRef.current = false
-    taskMapRef.current = {}
 
     // add user message to chat
     setMessages((prev) => [
@@ -393,30 +261,7 @@ export function useLanggraph() {
           return prev
         })
 
-        // if agents were dispatched, parse results from final thread state
-        if (didDispatchRef.current) {
-          try {
-            const state = await getThreadState(threadId)
-            const allMessages = state?.values?.messages || []
-            const lastAi = [...allMessages].reverse().find((m) => m.type === 'ai')
-            if (lastAi) {
-              const content = typeof lastAi.content === 'string'
-                ? lastAi.content
-                : Array.isArray(lastAi.content)
-                  ? lastAi.content.map((b) => (typeof b === 'string' ? b : b.text || '')).join('')
-                  : ''
-              const parsed = tryParseResults(content)
-              if (parsed) {
-                setResults(parsed)
-              } else {
-                setResults({ rawText: content })
-              }
-            }
-          } catch {
-            // failed to get thread state, results stay null
-          }
-        }
-
+        // No need to getThreadState — results are already rendered via task_completed events
         setIsSending(false)
         streamHandleRef.current = null
       }).catch((err) => {
@@ -465,7 +310,6 @@ export function useLanggraph() {
     setResults(null)
     setIsSending(false)
     setExecutionStarted(false)
-    taskMapRef.current = {}
     didDispatchRef.current = false
     if (streamHandleRef.current) {
       streamHandleRef.current.close()
