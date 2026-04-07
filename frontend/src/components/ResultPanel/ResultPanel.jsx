@@ -39,8 +39,10 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
                   <div className="card-main">
                     <div className="card-title">{flight.airline} {flight.flight_number}</div>
                     <div className="card-detail">{flight.origin} → {flight.destination}</div>
-                    <div className="card-detail">{flight.departure_time} - {flight.arrival_time}</div>
-                    <div className="card-price">{flight.price} {flight.currency}</div>
+                    <div className="card-detail">Depart: {flight.departure_time}</div>
+                    <div className="card-detail">Arrive: {flight.arrival_time}</div>
+                    {flight.stops && <div className="card-detail">{flight.stops}</div>}
+                    <div className="card-price">{flight.price} {flight.currency} <span className="price-note">(round trip, all passengers)</span></div>
                     {flight.source && <div className="card-source">via {flight.source}</div>}
                   </div>
                   <div className="card-actions">
@@ -80,7 +82,7 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
                   <div className="card-main">
                     <div className="card-title">{hotel.name}</div>
                     <div className="card-detail">{hotel.location}</div>
-                    <div className="card-price">{hotel.price_per_night}/night {hotel.currency}</div>
+                    <div className="card-price">{hotel.price_per_night}/night {hotel.currency} <span className="price-note">(per room)</span></div>
                     {hotel.rating && <div className="card-detail">Rating: {hotel.rating}</div>}
                     {hotel.source && <div className="card-source">via {hotel.source}</div>}
                   </div>
