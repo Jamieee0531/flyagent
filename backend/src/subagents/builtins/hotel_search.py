@@ -21,33 +21,24 @@ Your prompt contains structured search requirements. Pay attention to:
 <research_strategy>
 You MUST follow these phases in order. Do NOT skip any mandatory phase.
 
-**Phase 1 — Search Hotels (MANDATORY)**
-Use web_search to find hotels. Search at least 3 times:
-- Search 1: "best {star_rating} hotels in {city} {checkin_month}" to find top hotel options
-- Search 2: "Booking.com {hotel_name} {city}" for each hotel found, to get the Booking.com page URL
-- Search 3: "Agoda {hotel_name} {city}" to get Agoda page URL for comparison
+**Phase 1 — Get Real Hotel Data (MANDATORY)**
+Call serpapi_hotels to get real-time hotel prices from Google Hotels.
+- Pass a query like "4 star hotels in {city}" or "hotels in {city} {area}"
+- Include user preferences in the query (star rating, area, etc.)
+- This returns REAL prices, ratings, amenities, and hotel details
 
-The MOST IMPORTANT thing is to get REAL booking links from Booking.com or Agoda for each hotel.
-
-**Phase 2 — Verify Links (MANDATORY)**
-For each hotel, ensure you have a DIRECT booking URL:
-- Booking.com URL (e.g. https://www.booking.com/hotel/jp/xxx.html)
-- Or Agoda URL (e.g. https://www.agoda.com/xxx/hotel/tokyo-jp.html)
-- Use web_fetch on the URL to verify it's a real hotel page if unsure
-
-You MUST have a real booking_link for each hotel. NEVER leave it empty.
+**Phase 2 — Get Booking Links (MANDATORY)**
+For each hotel found in Phase 1, use web_search to find a direct booking link:
+- Search "Booking.com {hotel_name} {city}" to get the Booking.com page URL
+- Or search "Agoda {hotel_name} {city}" for Agoda link
+- Each hotel should have a DIFFERENT booking link
 
 **Phase 3 — Self-Check (MANDATORY)**
 Before outputting, verify:
-- You have at least 3 hotel options matching user preferences
-- Each option has a real booking_link (NOT empty)
-- Prices are marked as "estimated" if not confirmed from the booking site
+- You have at least 3 hotel options with REAL prices from serpapi_hotels
+- Each option has a booking_link (Booking.com or Agoda URL)
 - Results match user preferences (location, star rating, budget)
 If any check fails, go back to Phase 1 or 2.
-
-**OPTIONAL — Browser Search**
-If you want more accurate real-time prices, you can try browser_search(site="booking" or site="agoda").
-This is optional and may be slow. Do NOT rely on it.
 </research_strategy>
 
 <output_format>
@@ -60,24 +51,24 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
       "location": "Area, distance to key landmarks",
       "price_per_night": "SGD 200",
       "currency": "SGD",
-      "rating": "8.5/10",
+      "rating": "4.5/5",
       "image_url": "",
-      "booking_link": "https://www.booking.com/hotel/...",
-      "source": "Booking.com"
+      "booking_link": "https://www.booking.com/hotel/jp/...",
+      "source": "Google Hotels (SerpApi)"
     }
   ],
-  "search_summary": "Found X hotels, showing top 5 by value"
+  "search_summary": "Found X hotels, showing top 5. Prices are real-time from Google Hotels."
 }
 
 Rules:
 - Include up to 5 hotel options
-- Prices: use real prices if found, otherwise mark as "~SGD XXX (estimated)"
-- booking_link: MUST have a real URL for every hotel (Booking.com or Agoda). NEVER leave empty.
-- source: where the info came from (e.g. "Booking.com", "Agoda", "Web Search")
+- Prices are REAL from Google Hotels — do NOT mark as estimated
+- booking_link: use Booking.com or Agoda URL for each hotel. Each MUST have a different URL.
+- source: "Google Hotels (SerpApi)"
 </output_format>
 """,
-    tools=["browser_search", "web_search", "web_fetch"],
-    disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
+    tools=["serpapi_hotels", "web_search", "web_fetch"],
+    disallowed_tools=["task", "ask_clarification", "present_files", "view_image", "browser_search"],
     model="inherit",
     max_turns=40,
     timeout_seconds=900,
