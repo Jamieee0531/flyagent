@@ -55,7 +55,8 @@ def _load_skill_template(site: str) -> str | None:
 def _format_task(template: str, params: dict) -> str:
     """Replace placeholders in skill template with actual parameters.
 
-    Uses str.format_map with a defaultdict to leave unknown placeholders unchanged.
+    Uses simple string replacement to avoid conflicts with JSON curly braces
+    in skill templates.
 
     Args:
         template: Skill template with {placeholder} markers.
@@ -64,11 +65,10 @@ def _format_task(template: str, params: dict) -> str:
     Returns:
         Formatted task string.
     """
-    class SafeDict(dict):
-        def __missing__(self, key: str) -> str:
-            return f"{{{key}}}"
-
-    return template.format_map(SafeDict(params))
+    result = template
+    for key, value in params.items():
+        result = result.replace(f"{{{key}}}", str(value))
+    return result
 
 
 async def _run_browser_agent(task: str, timeout: int = 60) -> str:
@@ -84,7 +84,12 @@ async def _run_browser_agent(task: str, timeout: int = 60) -> str:
     from browser_use import Agent, BrowserProfile
     from langchain_google_genai import ChatGoogleGenerativeAI
 
-    llm = ChatGoogleGenerativeAI(
+    class GeminiWithProvider(ChatGoogleGenerativeAI):
+        """Wrapper that adds 'provider' attribute for browser-use compatibility."""
+        model_config = {"extra": "allow"}
+        provider: str = "google"
+
+    llm = GeminiWithProvider(
         model="gemini-2.5-flash",
         api_key=os.environ.get("GOOGLE_API_KEY"),
         temperature=0.3,
