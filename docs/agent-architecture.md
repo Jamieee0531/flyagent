@@ -17,9 +17,10 @@
                               Agent
 ```
 
-- Lead Agent 负责对话、派发任务、汇总结果
-- 4 个 Sub-agent 并行执行，互不依赖
+- Lead Agent 负责对话、派发任务（不再汇总，结果由前端直接从 task_completed 事件渲染）
+- 4 个 Sub-agent 并行执行，互不依赖，各自输出结构化 JSON
 - 所有通信通过 LangGraph Server 自带的 SSE 接口完成，不需要自己写 API
+- SSE 事件包含 subagent_type 字段，前端直接映射到对应面板
 
 ---
 
@@ -28,8 +29,8 @@
 ### 职责
 
 1. **聊天阶段**：和用户对话，收集旅行需求（目的地、日期、人数、预算、偏好）
-2. **触发阶段**：用户说"开始搜索"后，将需求打包，固定派发 4 个 sub-agent
-3. **汇总阶段**：4 个 sub-agent 返回结果后，整理汇总返回给前端
+2. **触发阶段**：用户说"开始搜索"后，将需求打包为结构化 prompt，固定派发 4 个 sub-agent
+3. **完成通知**：所有 sub-agent 返回后，用自然语言告知用户搜索完成（不做 JSON 汇总，卡片由前端 task_completed 事件直接渲染）
 
 ### System Prompt 结构（沿用 DeerFlow 模板）
 
