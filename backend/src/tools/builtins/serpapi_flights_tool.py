@@ -86,6 +86,7 @@ def serpapi_flights_tool(
             "destination": last_leg.get("arrival_airport", {}).get("id", arrival_id),
             "departure_time": first_leg.get("departure_airport", {}).get("time", ""),
             "arrival_time": last_leg.get("arrival_airport", {}).get("time", ""),
+            "return_date": return_date if return_date else "",
             "duration_minutes": f.get("total_duration", 0),
             "stops": "Nonstop" if stops == 0 else f"{stops} stop{'s' if stops > 1 else ''}",
             "price": f.get("price", "N/A"),

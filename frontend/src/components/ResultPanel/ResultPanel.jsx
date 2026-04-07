@@ -39,9 +39,10 @@ function ResultPanel({ results, favorites, onToggleFavorite }) {
                   <div className="card-main">
                     <div className="card-title">{flight.airline} {flight.flight_number}</div>
                     <div className="card-detail">{flight.origin} → {flight.destination}</div>
-                    <div className="card-detail">Depart: {flight.departure_time}</div>
-                    <div className="card-detail">Arrive: {flight.arrival_time}</div>
+                    <div className="card-detail">Outbound: {flight.departure_time} → {flight.arrival_time}</div>
+                    {flight.return_date && <div className="card-detail">Return: {flight.return_date}</div>}
                     {flight.stops && <div className="card-detail">{flight.stops}</div>}
+                    {flight.duration_minutes && <div className="card-detail">Duration: {Math.floor(flight.duration_minutes / 60)}h {flight.duration_minutes % 60}m</div>}
                     <div className="card-price">{flight.price} {flight.currency} <span className="price-note">(round trip, all passengers)</span></div>
                     {flight.source && <div className="card-source">via {flight.source}</div>}
                   </div>
