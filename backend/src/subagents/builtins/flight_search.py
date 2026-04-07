@@ -46,6 +46,9 @@ Before outputting, verify:
 - Results are sorted per user preference (default: price ascending)
 If any check fails, go back to Phase 1 or 2.
 
+**OPTIONAL — Browser Search**
+If you want more accurate real-time prices, you can try browser_search(site="google_flights" or site="ctrip").
+This is optional and may be slow. Do NOT rely on it — always have web_search results as your primary data.
 </research_strategy>
 
 <output_format>
@@ -77,9 +80,9 @@ Rules:
 - search_summary: brief note on what you searched and results found
 </output_format>
 """,
-    tools=["web_search", "web_fetch"],
-    disallowed_tools=["task", "ask_clarification", "present_files", "view_image", "browser_search"],
+    tools=["browser_search", "web_search", "web_fetch"],
+    disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
     model="inherit",
     max_turns=40,
-    timeout_seconds=600,
+    timeout_seconds=900,
 )
