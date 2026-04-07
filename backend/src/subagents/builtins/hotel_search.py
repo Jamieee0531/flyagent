@@ -13,7 +13,7 @@ Your job is to search for the best accommodation options based on the travel req
 
 <input_parsing>
 Your prompt contains structured search requirements. Pay attention to:
-- If Preferences are specified (e.g., "near Shinjuku station"), results MUST prioritize those
+- If Preferences are specified (e.g., "near Shinjuku station", "4-star or above"), results MUST prioritize those
 - If Sort by is specified, sort results accordingly
 - If no sort is specified, default to overall value (balancing price, rating, location)
 </input_parsing>
@@ -21,27 +21,25 @@ Your prompt contains structured search requirements. Pay attention to:
 <research_strategy>
 You MUST follow these phases in order. Do NOT skip any mandatory phase.
 
-**Phase 1 — API Search (MANDATORY)**
-Call liteapi_hotel_search with the correct city name, country code, dates, and guest count.
-If you are unsure of the country code, use web_search to look it up first.
+**Phase 1 — Real Price Search (MANDATORY)**
+Use browser_search to get real hotel prices from actual booking websites.
+- First call: browser_search(site="booking", query_params=<JSON with city, checkin, checkout, guests, rooms>)
+- Second call (if time allows): browser_search(site="agoda", query_params=<same params>)
 
-**Phase 2 — Supplementary Search (MANDATORY)**
+You MUST search at least 1 website. Searching 2 gives better price comparison.
+
+**Phase 2 — Supplementary Info (MANDATORY)**
 Use web_search to find additional information:
-- Hotel reviews and ratings from Booking.com, Agoda, TripAdvisor
+- Hotel reviews from TripAdvisor or other sources
 - Location details (proximity to transit, attractions)
-- Price comparisons across platforms
+- Any current deals or promotions
 
-**Phase 3 — Deep Verification (CONDITIONAL)**
-If Phase 1 returned fewer than 3 options, OR results don't match user preferences:
-- Try web_search with specific area names or landmarks
-- Use web_fetch to read hotel detail pages for ratings and amenities
-
-**Phase 4 — Self-Check (MANDATORY)**
+**Phase 3 — Self-Check (MANDATORY)**
 Before outputting, verify:
-- You have at least 3 options with real prices
-- LiteAPI results are included (unless LiteAPI returned an error)
-- Results match user preferences (location, budget, etc.)
-If any check fails, go back to Phase 2 or 3.
+- You have at least 3 hotel options with real prices from actual websites
+- Prices are from browser_search results (NOT estimated)
+- Results match user preferences (location, star rating, budget)
+If any check fails, try browser_search with the other site, or use web_search as fallback.
 </research_strategy>
 
 <output_format>
@@ -52,12 +50,12 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
     {
       "name": "Hotel Name",
       "location": "Area, distance to key landmarks",
-      "price_per_night": "$120",
-      "currency": "USD",
+      "price_per_night": "SGD 200",
+      "currency": "SGD",
       "rating": "8.5/10",
       "image_url": "",
-      "booking_link": "https://...",
-      "source": "LiteAPI"
+      "booking_link": "https://www.booking.com/hotel/...",
+      "source": "Booking.com"
     }
   ],
   "search_summary": "Found X hotels, showing top 5 by value"
@@ -65,16 +63,14 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
 
 Rules:
 - Include up to 5 hotel options
-- price_per_night must specify currency
-- rating: use platform score if available, empty string "" if not
-- image_url: use real URL if available, empty string "" if not
-- booking_link: use real URL if available, empty string "" if not
-- source: "LiteAPI", "Booking.com", "Agoda", etc.
+- Prices must be REAL prices from the website, not estimates
+- booking_link: use the actual hotel page URL, empty string "" if not available
+- source: "Booking.com", "Agoda", etc.
 </output_format>
 """,
-    tools=["liteapi_hotel_search", "web_search", "web_fetch"],
+    tools=["browser_search", "web_search", "web_fetch"],
     disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
     model="inherit",
     max_turns=40,
-    timeout_seconds=600,
+    timeout_seconds=900,
 )

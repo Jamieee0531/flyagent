@@ -7,29 +7,20 @@
 
 models:
   # Default model (Lead Agent + flight-search + hotel-search)
-  - name: claude-sonnet
-    display_name: Claude Sonnet 4
-    use: langchain_anthropic:ChatAnthropic
-    model: claude-sonnet-4-20250514
-    api_key: $ANTHROPIC_API_KEY
+  - name: gemini
+    display_name: Gemini 2.5 Flash
+    use: langchain_google_genai:ChatGoogleGenerativeAI
+    model: gemini-2.5-flash
+    api_key: $GOOGLE_API_KEY
     max_tokens: 4096
     temperature: 0.7
 
-  # For itinerary-planner (high TPM limit, cheap)
+  # For itinerary-planner
   - name: gpt-4o-mini
     display_name: GPT-4o Mini
     use: langchain_openai:ChatOpenAI
     model: gpt-4o-mini
     api_key: $OPENAI_API_KEY
-    max_tokens: 4096
-    temperature: 0.7
-
-  # For travel-tips (third provider, avoids rate limit collision)
-  - name: gemini
-    display_name: Gemini 2.0 Flash
-    use: langchain_google_genai:ChatGoogleGenerativeAI
-    model: gemini-2.5-flash
-    api_key: $GOOGLE_API_KEY
     max_tokens: 4096
     temperature: 0.7
 
@@ -69,12 +60,12 @@ sandbox:
 # ============================================================================
 
 subagents:
-  timeout_seconds: 600
+  timeout_seconds: 900
   agents:
     flight-search:
-      timeout_seconds: 600
+      timeout_seconds: 900
     hotel-search:
-      timeout_seconds: 600
+      timeout_seconds: 900
     itinerary-planner:
       timeout_seconds: 600
     travel-tips:

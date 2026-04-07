@@ -21,27 +21,25 @@ Your prompt contains structured search requirements. Pay attention to:
 <research_strategy>
 You MUST follow these phases in order. Do NOT skip any mandatory phase.
 
-**Phase 1 — API Search (MANDATORY)**
-Call duffel_flight_search with the correct IATA codes, date, and passenger count.
-If you are unsure of the IATA code for a city, use web_search to look it up first.
+**Phase 1 — Real Price Search (MANDATORY)**
+Use browser_search to get real flight prices from actual travel websites.
+- First call: browser_search(site="google_flights", query_params=<JSON with origin_city, destination_city, departure_date, return_date, passengers>)
+- Second call (if time allows): browser_search(site="skyscanner", query_params=<same params>)
 
-**Phase 2 — Supplementary Search (MANDATORY)**
+You MUST search at least 1 website. Searching 2 gives better price comparison.
+
+**Phase 2 — Supplementary Info (MANDATORY)**
 Use web_search to find additional information:
-- Budget airline options that Duffel may not cover
-- Baggage policies and layover details
-- Current promotions or deals
+- Baggage policies for the airlines found in Phase 1
+- Any current promotions or deals
+- Airline reviews and service quality
 
-**Phase 3 — Deep Verification (CONDITIONAL)**
-If Phase 1 returned fewer than 3 options, OR prices seem unusually high:
-- Try web_search with different keywords (nearby airports, flexible dates)
-- Use web_fetch to visit specific booking pages and verify prices
-
-**Phase 4 — Self-Check (MANDATORY)**
+**Phase 3 — Self-Check (MANDATORY)**
 Before outputting, verify:
-- You have at least 3 options with real prices
-- Duffel API results are included (unless Duffel returned an error)
+- You have at least 3 flight options with real prices from actual websites
+- Prices are from browser_search results (NOT estimated from web_search snippets)
 - Results are sorted per user preference (default: price ascending)
-If any check fails, go back to Phase 2 or 3.
+If any check fails, try browser_search with the other site, or use web_search as fallback.
 </research_strategy>
 
 <output_format>
@@ -56,10 +54,10 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
       "destination": "NRT",
       "departure_time": "2026-05-01 08:00",
       "arrival_time": "2026-05-01 16:00",
-      "price": "$450",
-      "currency": "USD",
+      "price": "SGD 1,312",
+      "currency": "SGD",
       "booking_link": "https://...",
-      "source": "Duffel"
+      "source": "Google Flights"
     }
   ],
   "search_summary": "Found X options from Y sources, showing top 5 by price"
@@ -67,15 +65,15 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
 
 Rules:
 - Include up to 5 flight options
-- All prices must include taxes and specify currency
-- booking_link: use real URL if available, empty string "" if not
-- source: "Duffel", "Google Flights", "Skyscanner", etc.
-- search_summary: brief note on what you searched and how many results found
+- Prices must be REAL prices from the website, not estimates
+- booking_link: use the actual URL from the travel website, empty string "" if not available
+- source: "Google Flights", "Skyscanner", etc.
+- search_summary: brief note on what you searched and results found
 </output_format>
 """,
-    tools=["duffel_flight_search", "web_search", "web_fetch"],
+    tools=["browser_search", "web_search", "web_fetch"],
     disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
     model="inherit",
     max_turns=40,
-    timeout_seconds=600,
+    timeout_seconds=900,
 )
