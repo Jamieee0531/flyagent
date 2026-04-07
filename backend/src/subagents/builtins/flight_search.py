@@ -23,9 +23,12 @@ You MUST follow these phases in order. Do NOT skip any mandatory phase.
 
 **Phase 1 — Get Real Flight Data (MANDATORY)**
 Call serpapi_flights to get real-time flight prices from Google Flights.
-- Pass the correct IATA codes for departure and arrival airports/cities
-- If you are unsure of the IATA code, use web_search to look it up first
+- IMPORTANT: Use AIRPORT codes (e.g. NRT, HND), NOT city codes (TYO will NOT work)
+- For cities with multiple airports (e.g. Tokyo has NRT and HND), call serpapi_flights TWICE — once for each airport
+- Common airport codes: Singapore=SIN, Tokyo Narita=NRT, Tokyo Haneda=HND, Seoul Incheon=ICN, Bangkok=BKK, Hong Kong=HKG
+- If you are unsure of the airport code, use web_search to look it up first
 - This returns REAL prices, airline names, flight numbers, times, and stops
+- Combine results from both calls and sort by price
 
 **Phase 2 — Get Booking Links (MANDATORY)**
 For each airline found in Phase 1, use web_search to find a booking link:
