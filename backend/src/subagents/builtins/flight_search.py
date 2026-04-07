@@ -21,26 +21,34 @@ Your prompt contains structured search requirements. Pay attention to:
 <research_strategy>
 You MUST follow these phases in order. Do NOT skip any mandatory phase.
 
-**Phase 1 — Real Price Search (MANDATORY)**
-Use browser_search to get real flight prices from actual travel websites.
-- First call: browser_search(site="google_flights", query_params=<JSON with origin_city, destination_city, departure_date, return_date, passengers>)
-- Second call: browser_search(site="ctrip", query_params=<JSON with origin_code, destination_code, departure_date, return_date, passengers>)
-  Note: ctrip uses IATA codes (SIN, TYO) not city names. Prices are in CNY (¥).
+**Phase 1 — Search Airlines and Flights (MANDATORY)**
+Use web_search to find flights for this route. Search at least 3 times with different queries:
+- Search 1: "{origin_city} to {destination_city} flights {departure_date}" to find available airlines and routes
+- Search 2: "{airline_name} {origin_city} to {destination_city} book" for each major airline found, to get their official booking page URL
+- Search 3: "Google Flights {origin_city} to {destination_city}" or "Skyscanner {origin_city} to {destination_city}" to find aggregator links
 
-You MUST search at least 1 website. Searching 2 gives better price comparison and cross-validation.
+The MOST IMPORTANT thing is to get REAL booking links — either airline official website URLs or Google Flights/Skyscanner search result URLs.
 
-**Phase 2 — Supplementary Info (MANDATORY)**
-Use web_search to find additional information:
-- Baggage policies for the airlines found in Phase 1
-- Any current promotions or deals
-- Airline reviews and service quality
+**Phase 2 — Get Booking Links (MANDATORY)**
+For each flight option found, use web_search or web_fetch to find the DIRECT booking URL:
+- Airline official website (e.g. https://www.singaporeair.com/..., https://www.jal.co.jp/...)
+- Or Google Flights link with the specific route pre-filled
+- Or Skyscanner/Trip.com link for that route
+
+You MUST have a real booking_link for each flight. If you cannot find a direct link, construct a Google Flights search URL:
+https://www.google.com/travel/flights?q=flights+{origin}+to+{destination}+{date}
 
 **Phase 3 — Self-Check (MANDATORY)**
 Before outputting, verify:
-- You have at least 3 flight options with real prices from actual websites
-- Prices are from browser_search results (NOT estimated from web_search snippets)
+- You have at least 3 flight options with airline names and routes
+- Each option has a real booking_link (NOT empty)
+- Prices are marked as "estimated" if not from official source
 - Results are sorted per user preference (default: price ascending)
-If any check fails, try browser_search with the other site, or use web_search as fallback.
+If any check fails, go back to Phase 1 or 2.
+
+**OPTIONAL — Browser Search**
+If you want more accurate real-time prices, you can try browser_search(site="google_flights" or site="ctrip").
+This is optional and may be slow. Do NOT rely on it — always have web_search results as your primary data.
 </research_strategy>
 
 <output_format>
@@ -66,9 +74,9 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
 
 Rules:
 - Include up to 5 flight options
-- Prices must be REAL prices from the website, not estimates
-- booking_link: use the actual URL from the travel website, empty string "" if not available
-- source: "Google Flights", "Skyscanner", etc.
+- Prices: use real prices if found, otherwise mark as "~SGD XXX (estimated)"
+- booking_link: MUST have a real URL for every flight (airline website, Google Flights, or Skyscanner). NEVER leave empty.
+- source: where the info came from (e.g. "JAL official website", "Google Flights", "Web Search")
 - search_summary: brief note on what you searched and results found
 </output_format>
 """,
