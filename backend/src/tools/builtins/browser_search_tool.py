@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 # Supported sites and their skill directory names
 SUPPORTED_SITES = {
     "google_flights": "google-flights",
+    "ctrip": "ctrip",
     "skyscanner": "skyscanner",
     "booking": "booking-com",
     "agoda": "agoda",
@@ -124,13 +125,14 @@ def browser_search_tool(
 
     Available sites:
     - google_flights: Best for flight search (broad coverage, real-time prices)
-    - skyscanner: Good for budget airlines and price comparison
+    - ctrip: Chinese travel platform, direct URL search, prices in CNY (携程)
+    - skyscanner: Good for budget airlines (may have CAPTCHA issues)
     - booking: Best for hotel search (largest inventory)
     - agoda: Good for Asian hotels and deals
 
     Args:
-        site: Target website. One of: google_flights, skyscanner, booking, agoda.
-        query_params: JSON string with search parameters. For flights: origin_city, destination_city, departure_date, return_date, passengers. For hotels: city, checkin, checkout, guests, rooms.
+        site: Target website. One of: google_flights, ctrip, skyscanner, booking, agoda.
+        query_params: JSON string with search parameters. For flights: origin_city, origin_code, destination_city, destination_code, departure_date, return_date, passengers. For hotels: city, checkin, checkout, guests, rooms.
     """
     # Validate site
     if site not in SUPPORTED_SITES:

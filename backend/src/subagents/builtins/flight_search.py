@@ -24,9 +24,10 @@ You MUST follow these phases in order. Do NOT skip any mandatory phase.
 **Phase 1 — Real Price Search (MANDATORY)**
 Use browser_search to get real flight prices from actual travel websites.
 - First call: browser_search(site="google_flights", query_params=<JSON with origin_city, destination_city, departure_date, return_date, passengers>)
-- Second call (if time allows): browser_search(site="skyscanner", query_params=<same params>)
+- Second call: browser_search(site="ctrip", query_params=<JSON with origin_code, destination_code, departure_date, return_date, passengers>)
+  Note: ctrip uses IATA codes (SIN, TYO) not city names. Prices are in CNY (¥).
 
-You MUST search at least 1 website. Searching 2 gives better price comparison.
+You MUST search at least 1 website. Searching 2 gives better price comparison and cross-validation.
 
 **Phase 2 — Supplementary Info (MANDATORY)**
 Use web_search to find additional information:
