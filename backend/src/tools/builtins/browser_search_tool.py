@@ -71,7 +71,7 @@ def _format_task(template: str, params: dict) -> str:
     return result
 
 
-async def _run_browser_agent(task: str, timeout: int = 60) -> str:
+async def _run_browser_agent(task: str, timeout: int = 180) -> str:
     """Run browser-use agent with the given task.
 
     Args:
@@ -82,14 +82,9 @@ async def _run_browser_agent(task: str, timeout: int = 60) -> str:
         The extracted result as a string.
     """
     from browser_use import Agent, BrowserProfile
-    from langchain_google_genai import ChatGoogleGenerativeAI
+    from browser_use.llm.google import ChatGoogle
 
-    class GeminiWithProvider(ChatGoogleGenerativeAI):
-        """Wrapper that adds 'provider' attribute for browser-use compatibility."""
-        model_config = {"extra": "allow"}
-        provider: str = "google"
-
-    llm = GeminiWithProvider(
+    llm = ChatGoogle(
         model="gemini-2.5-flash",
         api_key=os.environ.get("GOOGLE_API_KEY"),
         temperature=0.3,
