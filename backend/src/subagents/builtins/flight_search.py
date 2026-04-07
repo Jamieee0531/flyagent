@@ -21,34 +21,24 @@ Your prompt contains structured search requirements. Pay attention to:
 <research_strategy>
 You MUST follow these phases in order. Do NOT skip any mandatory phase.
 
-**Phase 1 — Search Airlines and Flights (MANDATORY)**
-Use web_search to find flights for this route. Search at least 3 times with different queries:
-- Search 1: "{origin_city} to {destination_city} flights {departure_date}" to find available airlines and routes
-- Search 2: "{airline_name} {origin_city} to {destination_city} book" for each major airline found, to get their official booking page URL
-- Search 3: "Google Flights {origin_city} to {destination_city}" or "Skyscanner {origin_city} to {destination_city}" to find aggregator links
-
-The MOST IMPORTANT thing is to get REAL booking links — either airline official website URLs or Google Flights/Skyscanner search result URLs.
+**Phase 1 — Get Real Flight Data (MANDATORY)**
+Call serpapi_flights to get real-time flight prices from Google Flights.
+- Pass the correct IATA codes for departure and arrival airports/cities
+- If you are unsure of the IATA code, use web_search to look it up first
+- This returns REAL prices, airline names, flight numbers, times, and stops
 
 **Phase 2 — Get Booking Links (MANDATORY)**
-For each flight option found, use web_search or web_fetch to find the DIRECT booking URL:
-- Airline official website (e.g. https://www.singaporeair.com/..., https://www.jal.co.jp/...)
-- Or Google Flights link with the specific route pre-filled
-- Or Skyscanner/Trip.com link for that route
-
-You MUST have a real booking_link for each flight. If you cannot find a direct link, construct a Google Flights search URL:
-https://www.google.com/travel/flights?q=flights+{origin}+to+{destination}+{date}
+For each airline found in Phase 1, use web_search to find a booking link:
+- Search "{airline_name} flights {origin} to {destination} book" to find the airline's official booking page
+- Each airline should have a DIFFERENT link (airline official website)
+- If you cannot find a specific airline link, use the airline's homepage URL
 
 **Phase 3 — Self-Check (MANDATORY)**
 Before outputting, verify:
-- You have at least 3 flight options with airline names and routes
-- Each option has a real booking_link (NOT empty)
-- Prices are marked as "estimated" if not from official source
+- You have at least 3 flight options with REAL prices from serpapi_flights
+- Each option has a booking_link (airline website, NOT all the same Google Flights URL)
 - Results are sorted per user preference (default: price ascending)
 If any check fails, go back to Phase 1 or 2.
-
-**OPTIONAL — Browser Search**
-If you want more accurate real-time prices, you can try browser_search(site="google_flights" or site="ctrip").
-This is optional and may be slow. Do NOT rely on it — always have web_search results as your primary data.
 </research_strategy>
 
 <output_format>
@@ -63,25 +53,25 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
       "destination": "NRT",
       "departure_time": "2026-05-01 08:00",
       "arrival_time": "2026-05-01 16:00",
-      "price": "SGD 1,312",
+      "price": "SGD 1312",
       "currency": "SGD",
-      "booking_link": "https://...",
-      "source": "Google Flights"
+      "booking_link": "https://www.singaporeair.com/...",
+      "source": "Google Flights (SerpApi)"
     }
   ],
-  "search_summary": "Found X options from Y sources, showing top 5 by price"
+  "search_summary": "Found X options, showing top 5 by price. Prices are real-time from Google Flights."
 }
 
 Rules:
 - Include up to 5 flight options
-- Prices: use real prices if found, otherwise mark as "~SGD XXX (estimated)"
-- booking_link: MUST have a real URL for every flight (airline website, Google Flights, or Skyscanner). NEVER leave empty.
-- source: where the info came from (e.g. "JAL official website", "Google Flights", "Web Search")
-- search_summary: brief note on what you searched and results found
+- Prices are REAL from Google Flights — do NOT mark as estimated
+- booking_link: use airline official website URL. Each airline MUST have a different URL. NEVER use the same link for all flights.
+- source: "Google Flights (SerpApi)"
+- search_summary: brief note on results
 </output_format>
 """,
-    tools=["browser_search", "web_search", "web_fetch"],
-    disallowed_tools=["task", "ask_clarification", "present_files", "view_image"],
+    tools=["serpapi_flights", "web_search", "web_fetch"],
+    disallowed_tools=["task", "ask_clarification", "present_files", "view_image", "browser_search"],
     model="inherit",
     max_turns=40,
     timeout_seconds=900,
