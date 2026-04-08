@@ -7,20 +7,76 @@
 ## 整体架构
 
 ```
-用户 → 前端 → LangGraph Server
-                    │
-                Lead Agent（对话 + 编排）
-                    │
-        ┌───────────┼───────────┬───────────┐
-        ↓           ↓           ↓           ↓
-   Flight Agent  Hotel Agent  Itinerary   Tips Agent
-                              Agent
+                         前端 (:3000)
+                        /            \
+            REST API                  SSE 流式
+              ↓                         ↓
+    Gateway (:8080)            LangGraph Server (:2024)
+    [Express + MongoDB]                 │
+    - 注册/登录 (JWT)           Lead Agent（对话 + 编排）
+    - 收藏管理 (CRUD)                   │
+                            ┌───────────┼───────────┬───────────┐
+                            ↓           ↓           ↓           ↓
+                       Flight Agent  Hotel Agent  Itinerary   Tips Agent
+                                                  Agent
 ```
 
+### 服务分工
+
+| 服务 | 端口 | 职责 | 运行方式 |
+|------|------|------|----------|
+| Gateway | :8080 | 用户认证（JWT）+ 收藏管理 | Docker Compose（含 MongoDB :27017） |
+| LangGraph Server | :2024 | Agent 聊天 + 搜索 + SSE 流式推送 | `cd backend && make dev` |
+| Frontend | :3000 | UI，分别连 Gateway 和 LangGraph | `cd frontend && npm run dev` |
+
+- **Gateway 和 LangGraph Server 完全解耦，不直接通信**
+- 前端负责分别对接两个后端：Gateway 处理 auth + favorites，LangGraph 处理 chat + agent SSE
+- 收藏数据流：LangGraph 产出结果卡片 → 前端渲染 → 用户点收藏 → 前端发给 Gateway 存 MongoDB
 - Lead Agent 负责对话、派发任务（不再汇总，结果由前端直接从 task_completed 事件渲染）
 - 4 个 Sub-agent 并行执行，互不依赖，各自输出结构化 JSON
-- 所有通信通过 LangGraph Server 自带的 SSE 接口完成，不需要自己写 API
 - SSE 事件包含 subagent_type 字段，前端直接映射到对应面板
+
+---
+
+## Gateway
+
+### 技术栈
+
+Node.js 20 + Express 5 + MongoDB 7 + Mongoose + bcryptjs + jsonwebtoken + Zod
+
+### API 端点
+
+| Method | Path | Auth | 说明 |
+|--------|------|------|------|
+| GET | `/health` | No | 健康检查 |
+| POST | `/api/auth/register` | No | 注册，返回 JWT + user |
+| POST | `/api/auth/login` | No | 登录，返回 JWT + user |
+| POST | `/api/auth/logout` | JWT | 登出（stateless） |
+| GET | `/api/favorites` | JWT | 获取用户收藏列表 |
+| POST | `/api/favorites` | JWT | 收藏结果卡片 |
+| DELETE | `/api/favorites/:id` | JWT | 删除收藏 |
+
+### 数据模型
+
+- **User**：email（唯一）、passwordHash（bcrypt）、profile、preferences
+- **Favorite**：userId、cardId、cardType（flight/hotel/itinerary/tips）、cardData（完整卡片 JSON）、note
+
+### 数据契约（待前端对接时解决）
+
+Gateway 收藏接口要求每张卡片有：
+- `cardId`：稳定唯一标识（当前 sub-agent 输出暂无此字段）
+- `cardType`：flight / hotel / itinerary / tips
+- `cardData.title`：卡片标题（当前 sub-agent 输出暂无统一 title 字段）
+
+### 安全措施
+
+- JWT 签发/验证，24h 过期
+- bcrypt 密码哈希（12 轮 salt）
+- Zod 请求体验证
+- 全局限流（100 req/15min/IP）+ auth 限流（10 req/15min/IP）
+- 生产环境错误信息脱敏
+- MongoDB/Gateway 端口仅绑定 127.0.0.1
+- 优雅关闭（SIGTERM + SIGINT）
 
 ---
 

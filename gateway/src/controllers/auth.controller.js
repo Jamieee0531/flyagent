@@ -41,13 +41,6 @@ async function register(req, res, next) {
   try {
     const { email, password, displayName } = req.body;
 
-    // Reject duplicate emails (Mongoose unique index would also catch this,
-    // but an explicit check gives a cleaner error message)
-    const existing = await User.findOne({ email });
-    if (existing) {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-
     const passwordHash = await hashPassword(password);
     const user = await User.create({
       email,
@@ -59,6 +52,10 @@ async function register(req, res, next) {
 
     return res.status(201).json({ token, user: safeUser(user) });
   } catch (err) {
+    // MongoDB duplicate key error — email already registered
+    if (err.code === 11000) {
+      return res.status(409).json({ error: 'Email already registered' });
+    }
     return next(err);
   }
 }

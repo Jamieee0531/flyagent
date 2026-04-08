@@ -74,9 +74,10 @@ const favoriteSchema = new Schema(
 
     /** Optional personal note the user can attach when saving. */
     note: {
-      type:    String,
-      trim:    true,
-      default: '',
+      type:      String,
+      trim:      true,
+      default:   '',
+      maxlength: [500, 'Note cannot exceed 500 characters'],
     },
 
     /** Explicit save timestamp stored alongside Mongoose's automatic timestamps. */

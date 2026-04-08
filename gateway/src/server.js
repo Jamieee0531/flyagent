@@ -15,11 +15,24 @@
 
 require('dotenv').config();
 
+// ---------------------------------------------------------------------------
+// Required environment variables — fail fast if missing
+// ---------------------------------------------------------------------------
+const REQUIRED_ENV = ['JWT_SECRET', 'MONGO_URI'];
+for (const key of REQUIRED_ENV) {
+  if (!process.env[key]) {
+    console.error(`[Config] Missing required env var: ${key}`);
+    process.exit(1);
+  }
+}
+
 const express = require('express');
 const cors    = require('cors');
 const morgan  = require('morgan');
+const mongoose = require('mongoose');
 
 const connectDB = require('./config/db');
+const { generalLimiter } = require('./middlewares/rateLimit.middleware');
 
 // Route modules
 const authRoutes     = require('./routes/auth.routes');
@@ -27,6 +40,7 @@ const favoriteRoutes = require('./routes/favorite.routes');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
+const isProd = process.env.NODE_ENV === 'production';
 
 // ---------------------------------------------------------------------------
 // Global middleware
@@ -45,11 +59,14 @@ app.use(cors({
   credentials:    false, // using localStorage + Bearer token, not cookies
 }));
 
-/** Parse incoming JSON request bodies. */
-app.use(express.json());
+/** Parse incoming JSON request bodies (capped at 50kb to prevent abuse). */
+app.use(express.json({ limit: '50kb' }));
 
-/** HTTP access logging — compact dev format (method, path, status, time). */
-app.use(morgan('dev'));
+/** Global rate limiter — 100 requests per 15 minutes per IP. */
+app.use(generalLimiter);
+
+/** HTTP access logging — dev format locally, combined (Apache-style) in production. */
+app.use(morgan(isProd ? 'combined' : 'dev'));
 
 // ---------------------------------------------------------------------------
 // Health check
@@ -106,10 +123,10 @@ app.use((req, res) => {
  */
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
-  console.error('[ERROR]', err.message, err.stack);
+  console.error('[ERROR]', err.message, isProd ? '' : err.stack);
   const status  = err.statusCode || err.status || 500;
-  const message = err.message    || 'Internal server error';
-  res.status(status).json({ error: message });
+  const message = (status < 500 || !isProd) ? err.message : 'Internal server error';
+  res.status(status).json({ error: message || 'Internal server error' });
 });
 
 // ---------------------------------------------------------------------------
@@ -122,9 +139,20 @@ app.use((err, req, res, _next) => {
  */
 (async () => {
   await connectDB();
-  app.listen(PORT, () => {
+  const server = app.listen(PORT, () => {
     console.log(`[Gateway] Listening on http://localhost:${PORT}`);
   });
+
+  // Graceful shutdown — drain connections before exiting
+  const shutdown = () => {
+    console.log('[Gateway] Shutting down gracefully...');
+    server.close(async () => {
+      await mongoose.connection.close();
+      process.exit(0);
+    });
+  };
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 })();
 
 module.exports = app; // exported for integration testing (Phase 3+)
