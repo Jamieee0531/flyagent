@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useLanggraph } from '../../hooks/useLanggraph';
+import { useCallback, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { getAnimalSvg } from '../../data/avatarSvg.js';
 import './ChatPanel.css';
 
@@ -10,75 +10,33 @@ const ACTION_CHIPS = [
   'Swap destination',
 ];
 
-export default function ChatPanel({ token, profile }) {
-  const { messages, sendMessage, isSending, results } = useLanggraph();
-  const [input, setInput] = useState('');
+export default function ChatPanel({ profile, messages, isSending, onSend, onStop }) {
   const messagesEndRef = useRef(null);
-  const profileSentRef = useRef(false);
+  const animalSvg = getAnimalSvg(profile?.mbtiType || '');
 
-  // Push results to center panel when they arrive
-  useEffect(() => {
-    if (!results) return;
-    if (results.flights && window.__nomieSetFlights) window.__nomieSetFlights(results.flights);
-    if (results.hotels && window.__nomieSetHotels) window.__nomieSetHotels(results.hotels);
-    if (results.itinerary && window.__nomieSetItinerary) window.__nomieSetItinerary(results.itinerary);
-    if (results.tips && window.__nomieSetTips) window.__nomieSetTips(results.tips);
-  }, [results]);
-
-  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Build profile context string (sent once with first message)
-  const buildProfileContext = () => {
-    if (!profile?.mbtiType) return '';
-    const qp = profile.quickPick || {};
-    const dims = profile.dimensions || {};
-    return [
-      `[Travel Profile]`,
-      `Personality: ${profile.mbtiTitle || profile.mbtiType} (${profile.mbtiSubtitle || ''})`,
-      `Dimensions: Escape ${dims.escape || 0}, Pace ${dims.pace || 0}, Nature ${dims.nature || 0}, Solitude ${dims.solitude || 0}, Quality ${dims.quality || 0}`,
-      qp.departure ? `From: ${qp.departure}` : '',
-      qp.companion ? `With: ${qp.companion}` : '',
-      qp.budget ? `Budget: ${qp.budget}` : '',
-      qp.timeWindow ? `When: ${qp.timeWindow}` : '',
-    ].filter(Boolean).join('\n');
-  };
-
-  // Prepend profile context to the first message only
-  const sendWithContext = (text) => {
-    if (!profileSentRef.current && profile?.mbtiType) {
-      profileSentRef.current = true;
-      const ctx = buildProfileContext();
-      sendMessage(`${ctx}\n\n${text}`);
-    } else {
-      sendMessage(text);
-    }
-  };
-
-  const handleSend = () => {
-    const text = input.trim();
-    if (!text || isSending) return;
-    setInput('');
-    sendWithContext(text);
-  };
-
-  const handleChip = (text) => {
-    if (isSending) return;
-    sendWithContext(text);
-  };
+  const handleSend = useCallback((text) => {
+    const trimmed = typeof text === 'string' ? text.trim() : '';
+    if (!trimmed || isSending) return;
+    onSend(trimmed);
+  }, [isSending, onSend]);
 
   return (
     <div className="chat-panel">
       <div className="chat-header">
         <div className="ch-avatar agent">
-          <span dangerouslySetInnerHTML={{ __html: getAnimalSvg(profile?.mbtiType || '') || '🐾' }} />
+          <span dangerouslySetInnerHTML={{ __html: animalSvg || '🐾' }} />
         </div>
         <div>
           <div className="ch-name">{profile?.pet?.name || 'Companion'}</div>
           <div className="ch-status">{isSending ? 'Thinking...' : 'Online'}</div>
         </div>
+        {isSending && onStop && (
+          <button className="stop-btn" onClick={onStop}>Stop</button>
+        )}
       </div>
 
       <div className="chat-messages">
@@ -86,39 +44,82 @@ export default function ChatPanel({ token, profile }) {
           <div key={msg.id} className={`chat-msg ${msg.role}`}>
             {msg.role === 'agent' && (
               <div className="msg-avatar agent">
-                <span dangerouslySetInnerHTML={{ __html: getAnimalSvg(profile?.mbtiType || '') || '🐾' }} />
+                <span dangerouslySetInnerHTML={{ __html: animalSvg || '🐾' }} />
               </div>
             )}
             <div className={`msg-bubble ${msg.role}`}>
-              {msg.text}
-              {msg.isStreaming && <span className="msg-cursor">|</span>}
+              {msg.role === 'agent'
+                ? msg.isStreaming
+                  ? <span style={{ whiteSpace: 'pre-wrap' }}>{msg.text}▌</span>
+                  : <ReactMarkdown>{msg.text}</ReactMarkdown>
+                : <>{msg.text}{msg.isStreaming && <span className="msg-cursor">|</span>}</>}
             </div>
           </div>
         ))}
+        {isSending && messages[messages.length - 1]?.role !== 'agent' && (
+          <div className="chat-msg agent">
+            <div className="msg-avatar agent">
+              <span dangerouslySetInnerHTML={{ __html: animalSvg || '🐾' }} />
+            </div>
+            <div className="typing-dots">
+              <div className="typing-dot" />
+              <div className="typing-dot" />
+              <div className="typing-dot" />
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       <div className="chat-chips">
         {ACTION_CHIPS.map((chip) => (
-          <button key={chip} className="action-chip" onClick={() => handleChip(chip)} disabled={isSending}>
+          <button
+            key={chip}
+            className="action-chip"
+            onClick={() => handleSend(chip)}
+            disabled={isSending}
+          >
             {chip}
           </button>
         ))}
       </div>
 
-      <div className="chat-input-bar">
-        <input
-          className="chat-input"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder="Message your travel companion..."
-          disabled={isSending}
-        />
-        <button className="chat-send-btn" onClick={handleSend} disabled={isSending || !input.trim()}>
-          &#8593;
-        </button>
-      </div>
+      <ChatInput onSend={handleSend} disabled={isSending} />
+    </div>
+  );
+}
+
+function ChatInput({ onSend, disabled }) {
+  const inputRef = useRef(null);
+
+  const submit = () => {
+    const val = inputRef.current?.value.trim();
+    if (!val) return;
+    inputRef.current.value = '';
+    onSend(val);
+  };
+
+  return (
+    <div className="chat-input-bar">
+      <input
+        ref={inputRef}
+        className="chat-input"
+        placeholder="Message your travel companion..."
+        disabled={disabled}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            submit();
+          }
+        }}
+      />
+      <button
+        className="chat-send-btn"
+        onClick={submit}
+        disabled={disabled}
+      >
+        &#8593;
+      </button>
     </div>
   );
 }

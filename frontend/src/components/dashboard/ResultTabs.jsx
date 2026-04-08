@@ -4,11 +4,17 @@ import HotelList from './HotelList';
 import TipsSummary from './TipsSummary';
 import ItineraryDay from './ItineraryDay';
 import TripMap from './TripMap';
-import { useAuth } from '../../hooks/useAuth';
 import { createTravelPlan } from '../../api/gateway';
 import './ResultTabs.css';
 
-export default function ResultTabs({ token, profile, onPlanSaved, savedPlanData, onClearSavedPlan }) {
+export default function ResultTabs({
+  token,
+  profile,
+  results,
+  onPlanSaved,
+  savedPlanData,
+  onClearSavedPlan,
+}) {
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedFlight, setSelectedFlight] = useState(null);
   const [selectedHotel, setSelectedHotel] = useState(null);
@@ -18,6 +24,15 @@ export default function ResultTabs({ token, profile, onPlanSaved, savedPlanData,
   const [tips, setTips] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+
+  // Sync AI agent results into local display state
+  useEffect(() => {
+    if (!results) return;
+    if (results.flights) setFlights(results.flights);
+    if (results.hotels) setHotels(results.hotels);
+    if (results.itinerary) setItinerary(results.itinerary);
+    if (results.tips) setTips(results.tips);
+  }, [results]);
 
   // Load saved plan data when user clicks a Wishlist item
   useEffect(() => {
@@ -62,14 +77,6 @@ export default function ResultTabs({ token, profile, onPlanSaved, savedPlanData,
     setSaving(false);
   };
 
-  // Expose setters for ChatPanel to push results into
-  if (typeof window !== 'undefined') {
-    window.__nomieSetFlights = setFlights;
-    window.__nomieSetHotels = setHotels;
-    window.__nomieSetItinerary = setItinerary;
-    window.__nomieSetTips = setTips;
-  }
-
   return (
     <>
       {isViewingSavedPlan && (
@@ -92,6 +99,7 @@ export default function ResultTabs({ token, profile, onPlanSaved, savedPlanData,
           <span style={{ fontSize: '14px', fontWeight: 500 }}>{savedPlanData.planName}</span>
         </div>
       )}
+
       <div className="day-tabs">
         {tabs.map((tab) => (
           <button
@@ -115,32 +123,24 @@ export default function ResultTabs({ token, profile, onPlanSaved, savedPlanData,
               </div>
             )}
             {flights.length > 0 && (
-              <FlightList
-                flights={flights}
-                selected={selectedFlight}
-                onSelect={setSelectedFlight}
-              />
+              <FlightList flights={flights} selected={selectedFlight} onSelect={setSelectedFlight} />
             )}
             {hotels.length > 0 && (
-              <HotelList
-                hotels={hotels}
-                selected={selectedHotel}
-                onSelect={setSelectedHotel}
-              />
+              <HotelList hotels={hotels} selected={selectedHotel} onSelect={setSelectedHotel} />
             )}
             {tips && <TipsSummary tips={tips} />}
           </div>
         ) : (
           <>
-          <TripMap stops={itinerary.find((d) => `day-${d.day}` === activeTab)?.stops} />
-          <ItineraryDay
-            day={itinerary.find((d) => `day-${d.day}` === activeTab)}
-            onUpdate={(updated) => {
-              setItinerary((prev) =>
-                prev.map((d) => d.day === updated.day ? updated : d)
-              );
-            }}
-          />
+            <TripMap stops={itinerary.find((d) => `day-${d.day}` === activeTab)?.stops} />
+            <ItineraryDay
+              day={itinerary.find((d) => `day-${d.day}` === activeTab)}
+              onUpdate={(updated) => {
+                setItinerary((prev) =>
+                  prev.map((d) => (d.day === updated.day ? updated : d))
+                );
+              }}
+            />
           </>
         )}
       </div>
@@ -155,7 +155,14 @@ export default function ResultTabs({ token, profile, onPlanSaved, savedPlanData,
             {saving ? 'Saving...' : 'Save Plan'}
           </button>
           {saveMsg && (
-            <span className="save-msg" style={{ marginLeft: '12px', fontSize: '13px', color: saveMsg.startsWith('Failed') ? '#c4593a' : '#4a6b5a' }}>
+            <span
+              className="save-msg"
+              style={{
+                marginLeft: '12px',
+                fontSize: '13px',
+                color: saveMsg.startsWith('Failed') ? '#c4593a' : '#4a6b5a',
+              }}
+            >
               {saveMsg}
             </span>
           )}

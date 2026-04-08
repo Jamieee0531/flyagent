@@ -36,7 +36,7 @@ const SUBAGENT_TO_PANEL_ID = {
   'travel-tips': 'tips',
 }
 
-export function useLanggraph() {
+export function useLanggraph(_profile) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [agents, setAgents] = useState(buildIdleAgents)
   const [results, setResults] = useState(null)
