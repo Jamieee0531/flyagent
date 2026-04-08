@@ -35,8 +35,9 @@ const connectDB = require('./config/db');
 const { generalLimiter } = require('./middlewares/rateLimit.middleware');
 
 // Route modules
-const authRoutes     = require('./routes/auth.routes');
-const favoriteRoutes = require('./routes/favorite.routes');
+const authRoutes       = require('./routes/auth.routes');
+const profileRoutes    = require('./routes/profile.routes');
+const travelPlanRoutes = require('./routes/travelPlan.routes');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -89,8 +90,9 @@ app.get('/health', (_req, res) => {
 // Route mounting
 // ---------------------------------------------------------------------------
 
-app.use('/api/auth',      authRoutes);
-app.use('/api/favorites', favoriteRoutes);
+app.use('/api/auth',         authRoutes);
+app.use('/api/user/profile', profileRoutes);
+app.use('/api/travel-plans', travelPlanRoutes);
 
 // ---------------------------------------------------------------------------
 // 404 handler

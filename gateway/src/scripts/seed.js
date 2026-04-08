@@ -1,33 +1,11 @@
-/**
- * @file seed.js
- * @description Database seed script for the Nomie API Gateway.
- *
- * Creates two demo user accounts and a set of sample favorites so
- * that evaluators can immediately explore the API without manual setup.
- *
- * Usage:
- *   npm run seed                   (uses gateway/.env by default)
- *   MONGO_URI=<uri> npm run seed   (override URI inline)
- *
- * Idempotent: running the script twice is safe — it clears existing
- * seed data before reinserting, identified by emails ending in
- * @nomie-seed.example.
- *
- * WARNING: Do NOT run against a production database.
- */
-
 'use strict';
 
 require('dotenv').config();
 
-const mongoose = require('mongoose');
-const bcrypt   = require('bcryptjs');
-const User     = require('../models/User');
-const Favorite = require('../models/Favorite');
-
-// ---------------------------------------------------------------------------
-// Seed data definitions
-// ---------------------------------------------------------------------------
+const mongoose   = require('mongoose');
+const bcrypt     = require('bcryptjs');
+const User       = require('../models/User');
+const TravelPlan = require('../models/TravelPlan');
 
 const SEED_USERS = [
   {
@@ -42,73 +20,48 @@ const SEED_USERS = [
   },
 ];
 
-/**
- * Build sample favorite records for a given userId.
- *
- * @param {string} userId - MongoDB ObjectId string of the owning user.
- * @returns {Array} Array of favorite document objects.
- */
-function makeFavorites(userId) {
+function makeTravelPlans(userId) {
   return [
     {
       userId,
-      cardId:   `flight-seed-MH001-${userId}`,
-      cardType: 'flight',
-      cardData: {
-        id:        `flight-seed-MH001-${userId}`,
-        type:      'flight',
-        title:     'Malaysia Airlines MH001 — KUL → SIN',
-        price:     'SGD 180',
+      name: 'Tokyo 5-Day Trip',
+      selectedFlight: {
+        airline: 'Singapore Airlines',
+        flightNumber: 'SQ638',
+        price: 'SGD 850',
         departure: '08:00',
-        arrival:   '09:05',
-        airline:   'Malaysia Airlines',
+        arrival: '16:00',
       },
-      note: 'Cheapest morning option',
-    },
-    {
-      userId,
-      cardId:   `hotel-seed-marina-${userId}`,
-      cardType: 'hotel',
-      cardData: {
-        id:      `hotel-seed-marina-${userId}`,
-        type:    'hotel',
-        title:   'Marina Bay Sands — Deluxe Room',
-        price:   'SGD 420 / night',
-        rating:  4.8,
-        address: '10 Bayfront Avenue, Singapore',
+      selectedHotel: {
+        name: 'Shinjuku Granbell Hotel',
+        price: 'SGD 200/night',
+        rating: 4.5,
+        address: 'Shinjuku, Tokyo',
       },
-      note: '',
-    },
-    {
-      userId,
-      cardId:   `itinerary-seed-sg3d-${userId}`,
-      cardType: 'itinerary',
-      cardData: {
-        id:    `itinerary-seed-sg3d-${userId}`,
-        type:  'itinerary',
-        title: '3-Day Singapore Highlights',
-        price: 'N/A',
-        days: [
-          'Day 1: Gardens by the Bay, Marina Bay',
-          'Day 2: Sentosa Island, Universal Studios',
-          'Day 3: Chinatown, Little India, Hawker Centre',
-        ],
-      },
-      note: 'Agent-generated plan, looks solid',
+      itinerary: [
+        {
+          day: 1,
+          stops: [
+            { time: '09:00', name: 'Senso-ji Temple', description: 'Historic Buddhist temple in Asakusa', transport: 'Metro' },
+            { time: '12:00', name: 'Nakamise Shopping Street', description: 'Traditional snacks and souvenirs' },
+            { time: '15:00', name: 'Tokyo Skytree', description: 'Observation deck with city views', transport: 'Walk' },
+          ],
+        },
+        {
+          day: 2,
+          stops: [
+            { time: '10:00', name: 'Meiji Shrine', description: 'Peaceful shrine in Harajuku', transport: 'JR Line' },
+            { time: '13:00', name: 'Shibuya Crossing', description: 'Iconic scramble crossing', transport: 'Walk' },
+          ],
+        },
+      ],
+      tips: { visa: 'No visa needed for Singapore passport holders (90 days)', currency: 'JPY', weather: 'Cherry blossom season in April' },
+      mbtiType: 'migratory-wanderer',
+      quickPick: { departure: 'Singapore', companion: 'partner', budget: '$500-1000', timeWindow: 'This month' },
     },
   ];
 }
 
-// ---------------------------------------------------------------------------
-// Main seed function
-// ---------------------------------------------------------------------------
-
-/**
- * Connect to MongoDB, wipe previous seed data, and insert fresh records.
- *
- * @async
- * @returns {Promise<void>}
- */
 async function seed() {
   const uri = process.env.MONGO_URI;
   if (!uri) {
@@ -120,18 +73,16 @@ async function seed() {
   await mongoose.connect(uri);
   console.log('[Seed] Connected.');
 
-  // ---- Clean up previous seed runs ----
   const seedEmails = SEED_USERS.map((u) => u.email);
   const oldUsers   = await User.find({ email: { $in: seedEmails } }).lean();
   const oldIds     = oldUsers.map((u) => u._id.toString());
 
   if (oldIds.length) {
-    await Favorite.deleteMany({ userId: { $in: oldIds } });
+    await TravelPlan.deleteMany({ userId: { $in: oldIds } });
     await User.deleteMany({ email: { $in: seedEmails } });
-    console.log(`[Seed] Removed ${oldIds.length} old seed user(s) and their favorites.`);
+    console.log(`[Seed] Removed ${oldIds.length} old seed user(s) and their travel plans.`);
   }
 
-  // ---- Insert seed users ----
   const SALT_ROUNDS = 12;
   const createdUsers = [];
 
@@ -147,17 +98,16 @@ async function seed() {
     console.log(`[Seed] Created user: ${user.email} (_id: ${user._id})`);
   }
 
-  // ---- Insert seed favorites for each user ----
   for (const user of createdUsers) {
-    const favDocs = makeFavorites(user._id.toString());
-    await Favorite.insertMany(favDocs);
-    console.log(`[Seed]   → Inserted ${favDocs.length} favorites for ${user.email}`);
+    const planDocs = makeTravelPlans(user._id.toString());
+    await TravelPlan.insertMany(planDocs);
+    console.log(`[Seed]   → Inserted ${planDocs.length} travel plan(s) for ${user.email}`);
   }
 
-  console.log('\n[Seed] ✅  Done. Summary:');
-  console.log(`  Users created    : ${createdUsers.length}`);
-  console.log(`  Favorites seeded : ${createdUsers.length * makeFavorites('x').length}`);
-  console.log('\n  Login credentials (demo only — do not use in production):');
+  console.log('\n[Seed] Done. Summary:');
+  console.log(`  Users created      : ${createdUsers.length}`);
+  console.log(`  Travel plans seeded: ${createdUsers.length * makeTravelPlans('x').length}`);
+  console.log('\n  Login credentials (demo only):');
   SEED_USERS.forEach((u) => {
     console.log(`    email: ${u.email}  |  password: ${u.password}`);
   });

@@ -49,8 +49,11 @@ Your FINAL message must be ONLY a valid JSON object matching this exact schema. 
       "day": 1,
       "theme": "Historic Tokyo",
       "morning": "Visit Senso-ji Temple in Asakusa (9:00-11:00). Free admission, open 24h.",
+      "morning_location": "Senso-ji Temple, Asakusa, Tokyo",
       "afternoon": "Explore Ueno Park and National Museum (12:00-16:00). Museum \\u00a51000.",
+      "afternoon_location": "Ueno Park, Tokyo",
       "evening": "Dinner at Ameyoko street food market, then stroll along Sumida River.",
+      "evening_location": "Ameyoko Market, Ueno, Tokyo",
       "transport_notes": "Take Ginza Line from Asakusa to Ueno (3 min, \\u00a5170)"
     }
   ],
@@ -61,6 +64,7 @@ Rules:
 - One entry per travel day
 - Include approximate timing for each activity
 - morning/afternoon/evening should be specific and actionable
+- morning_location/afternoon_location/evening_location: the main place name for each period, specific enough for Google Maps (e.g. "Senso-ji Temple, Asakusa, Tokyo")
 - transport_notes: how to get between areas, empty string "" if walking distance
 </output_format>
 """,
