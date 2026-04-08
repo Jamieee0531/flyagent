@@ -7,7 +7,7 @@ const INITIAL_MESSAGES = [
   {
     id: 'welcome-1',
     role: 'agent',
-    text: 'Hi there! Tell me about your trip — where to, when, and how many people?',
+    text: "Hi! I've got your travel personality profile ready. Tell me where you'd like to go, or just say \"suggest something\" and I'll recommend destinations that match your style!",
     isStreaming: false,
   },
 ]
@@ -226,8 +226,32 @@ export function useLanggraph() {
           const base = prev || {}
           if (panelId === 'flight') return { ...base, flights: parsed.flights || [] }
           if (panelId === 'hotel') return { ...base, hotels: parsed.hotels || [] }
-          if (panelId === 'itinerary') return { ...base, itinerary: parsed.days || [] }
-          if (panelId === 'tips') return { ...base, tips: parsed.categories || [] }
+          if (panelId === 'itinerary') {
+            // Normalize itinerary: agent returns { days: [{ day, theme, morning, afternoon, evening, transport_notes }] }
+            const rawDays = parsed.days || parsed.itinerary || []
+            const normalized = rawDays.map((d, idx) => {
+              // If agent returns morning/afternoon/evening format (no stops array)
+              if (d.morning || d.afternoon || d.evening) {
+                const stops = []
+                if (d.morning) stops.push({ time: 'Morning', name: d.theme ? `${d.theme} — Morning` : 'Morning', description: d.morning, transport: '', location: d.morning_location || '' })
+                if (d.afternoon) stops.push({ time: 'Afternoon', name: 'Afternoon', description: d.afternoon, transport: '', location: d.afternoon_location || '' })
+                if (d.evening) stops.push({ time: 'Evening', name: 'Evening', description: d.evening, transport: d.transport_notes || '', location: d.evening_location || '' })
+                return { day: d.day || idx + 1, theme: d.theme || '', stops }
+              }
+              // If agent returns stops/activities/places array format
+              return {
+                day: d.day || d.day_number || idx + 1,
+                stops: (d.stops || d.activities || d.places || []).map((s) => ({
+                  time: s.time || s.start_time || '',
+                  name: s.name || s.activity || s.place || s.title || '',
+                  description: s.description || s.details || s.notes || '',
+                  transport: s.transport || s.transportation || s.travel_mode || '',
+                })),
+              }
+            })
+            return { ...base, itinerary: normalized }
+          }
+          if (panelId === 'tips') return { ...base, tips: parsed.categories || parsed.tips || [] }
           return base
         })
       }

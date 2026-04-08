@@ -1,0 +1,124 @@
+.profile-hero {
+  padding: 20px 16px 16px;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.persona-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.persona-avatar {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--warm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(0,0,0,0.06);
+  overflow: hidden;
+}
+.persona-avatar svg { width: 100%; height: 100%; }
+.persona-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 18px;
+  font-weight: 600;
+}
+.persona-subtitle {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.pet-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 0.5px solid var(--border);
+}
+.pet-avatar-sm {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: #fde8de;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(196,89,58,0.15);
+  overflow: hidden;
+}
+.pet-avatar-sm svg {
+  width: 52px !important;
+  height: 52px !important;
+  display: block;
+}
+.pet-info-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+.pet-info-type {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: .3px;
+}
+
+.mbti-badge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  background: var(--warm);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  width: 100%;
+}
+.mbti-label {
+  font-size: 9px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  width: 100%;
+}
+.mbti-type {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.mbti-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.dim-bars { display: flex; flex-direction: column; gap: 6px; }
+.dim-row-sm { display: flex; align-items: center; gap: 8px; }
+.dim-label-sm { font-size: 10px; color: var(--muted); width: 54px; flex-shrink: 0; }
+.dim-track-sm { flex: 1; height: 3px; background: var(--warm2, var(--warm)); border-radius: 2px; overflow: hidden; }
+.dim-fill-sm { height: 100%; border-radius: 2px; }
+.dim-val-sm { font-size: 10px; color: var(--muted); width: 24px; text-align: right; }
+
+.profile-section {
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--border);
+}
+.ps-label {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: block;
+}
+.constraint-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+.ci-key { font-size: 11px; color: var(--muted); }
+.ci-val { font-size: 11px; font-weight: 500; }

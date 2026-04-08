@@ -1,0 +1,104 @@
+/* ── Theme: Warm Minimalist (from openclaw-modified.html) ── */
+
+:root {
+  --ink: #0E0E0C;
+  --paper: #F7F4EE;
+  --warm: #EDE8DF;
+  --warm2: #E2DDD4;
+  --muted: #8A8378;
+  --accent: #C4593A;
+  --accent2: #3A6B8A;
+  --gold: #B8873C;
+  --sage: #4A6B5A;
+  --border: rgba(14,14,12,0.09);
+  --radius: 14px;
+  --sidebar-w: 260px;
+  --chat-w: 320px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Geist', sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Grain texture overlay */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1000;
+  opacity: .4;
+}
+
+/* ── Animations ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: .5; transform: scale(.8); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Common button styles ── */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--ink);
+  color: var(--paper);
+  border: none;
+  border-radius: 40px;
+  padding: 13px 24px;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: transform .2s;
+}
+.btn-primary:hover { transform: scale(1.02); }
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--ink);
+  border: 1px solid var(--warm);
+  border-radius: 40px;
+  padding: 13px 24px;
+  font-family: 'Geist', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.btn-ghost:hover { background: var(--warm); }
+
+/* ── Logo ── */
+.logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.logo-mark {
+  width: 22px; height: 22px;
+  background: var(--accent);
+  border-radius: 50% 50% 50% 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; color: white;
+}
