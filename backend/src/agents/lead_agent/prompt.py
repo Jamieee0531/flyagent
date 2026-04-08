@@ -104,20 +104,7 @@ You are Nomie, a cute and friendly AI travel planning assistant. You help users 
 {soul}
 {memory_context}
 
-<mbti_profile_context>
-You will receive the user's travel personality profile at the start of conversation, including:
-- MBTI travel personality type and 5 dimension scores (escape, pace, nature, solitude, quality)
-- Departure city, travel companion type, budget range, and time window
-
-Use this information proactively:
-- Suggest destinations that match their personality (e.g., slow-pace + nature → Kyoto, Chiang Mai)
-- Do NOT re-ask information already provided in the profile (departure, budget, companion, time)
-- Reference their personality traits naturally in conversation
-- When dispatching sub-agents, include the personality context in the task prompt
-
-Example opening:
-"Hi! I see you're a Migratory Wanderer who loves slow-paced city exploration. From Singapore, two of you, budget under $1000. I think Kyoto would be perfect — the temple gardens and backstreet cafés match your style. Or maybe Chiang Mai for a more relaxed vibe. Which sounds better?"
-</mbti_profile_context>
+{profile_section}
 
 <thinking_style>
 - Think concisely and strategically about the user's request BEFORE taking action
@@ -126,8 +113,8 @@ Example opening:
 {subagent_thinking}- Never write down your full final answer or report in thinking process, but only outline
 - CRITICAL: After thinking, you MUST provide your actual response to the user. Thinking is for planning, the response is for delivery.
 - Your response must contain the actual answer, not just a reference to what you thought about
-- For travel planning: first check if the user sent a [Travel Profile] message. If so, use the profile data (departure, companion, budget, time) as known information — do NOT re-ask these.
-- If no profile was sent, check if destination, origin, dates, and traveler count are known. If not, ask before proceeding.
+- For travel planning: if a <user_travel_profile> section is present in your system prompt, treat that data (departure, companion, budget, time) as known — do NOT re-ask.
+- If no profile is available, check if destination, origin, dates, and traveler count are known. If not, ask before proceeding.
 - Optional but helpful info to collect: accommodation preference, must-see attractions, travel style
 - Only dispatch sub-agents when the user explicitly confirms to start searching
 </thinking_style>
@@ -319,7 +306,39 @@ def get_agent_soul(agent_name: str | None) -> str:
     return ""
 
 
-def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagents: int = 3, *, agent_name: str | None = None, available_skills: set[str] | None = None) -> str:
+def _build_profile_section(profile: dict | None) -> str:
+    """Render the user's travel profile as a system prompt section.
+
+    Returns an empty string if no profile is provided, so the placeholder
+    is replaced cleanly without leaving empty XML tags in the prompt.
+    """
+    if not profile or not profile.get("mbtiType"):
+        return ""
+
+    dims = profile.get("dimensions") or {}
+    qp = profile.get("quickPick") or {}
+
+    dim_str = ", ".join(
+        f"{k.capitalize()} {v}"
+        for k, v in dims.items()
+        if v is not None
+    )
+
+    lines = [
+        f"Personality: {profile.get('mbtiTitle') or profile['mbtiType']}",
+        f"Subtitle: {profile.get('mbtiSubtitle', '')}",
+        f"Dimensions: {dim_str}" if dim_str else None,
+        f"From: {qp['departure']}" if qp.get("departure") else None,
+        f"With: {qp['companion']}" if qp.get("companion") else None,
+        f"Budget: {qp['budget']}" if qp.get("budget") else None,
+        f"When: {qp['timeWindow']}" if qp.get("timeWindow") else None,
+    ]
+
+    content = "\n".join(line for line in lines if line)
+    return f"<user_travel_profile>\n{content}\n</user_travel_profile>\n"
+
+
+def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagents: int = 3, *, agent_name: str | None = None, available_skills: set[str] | None = None, profile: dict | None = None) -> str:
     # Get memory context
     memory_context = _get_memory_context(agent_name)
 
@@ -348,12 +367,13 @@ def apply_prompt_template(subagent_enabled: bool = False, max_concurrent_subagen
     # Get skills section
     skills_section = get_skills_prompt_section(available_skills)
 
-    # Format the prompt with dynamic skills and memory
+    # Format the prompt with dynamic skills, memory, and profile
     prompt = SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "Nomie",
         soul=get_agent_soul(agent_name),
         skills_section=skills_section,
         memory_context=memory_context,
+        profile_section=_build_profile_section(profile),
         subagent_section=subagent_section,
         subagent_reminder=subagent_reminder,
         subagent_thinking=subagent_thinking,

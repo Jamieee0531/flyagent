@@ -55,7 +55,7 @@ export async function cancelRun(threadId, runId) {
   if (!res.ok) throw new Error(`cancelRun failed: ${res.status}`)
 }
 
-export function streamRun(threadId, message, onEvent) {
+export function streamRun(threadId, message, onEvent, extraConfigurable = {}) {
   const abortController = new AbortController()
 
   const promise = getAssistantId().then(async (assistantId) => {
@@ -68,6 +68,7 @@ export function streamRun(threadId, message, onEvent) {
         configurable: {
           thread_id: threadId,
           subagent_enabled: true,
+          ...extraConfigurable,
         },
       },
       stream_mode: ['values', 'messages-tuple', 'custom'],

@@ -36,7 +36,7 @@ const SUBAGENT_TO_PANEL_ID = {
   'travel-tips': 'tips',
 }
 
-export function useLanggraph(_profile) {
+export function useLanggraph(profile) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [agents, setAgents] = useState(buildIdleAgents)
   const [results, setResults] = useState(null)
@@ -307,7 +307,18 @@ export function useLanggraph(_profile) {
       }
 
       // start SSE stream — DO NOT await, let events drive UI in real-time
-      const handle = streamRun(threadId, text, handleSSEEvent)
+      const profileConfigurable = profile
+        ? {
+            profile: {
+              mbtiType: profile.mbtiType,
+              mbtiTitle: profile.mbtiTitle,
+              mbtiSubtitle: profile.mbtiSubtitle,
+              dimensions: profile.dimensions,
+              quickPick: profile.quickPick,
+            },
+          }
+        : {}
+      const handle = streamRun(threadId, text, handleSSEEvent, profileConfigurable)
       streamHandleRef.current = handle
 
       // handle stream completion in background
@@ -343,7 +354,7 @@ export function useLanggraph(_profile) {
       ])
       setIsSending(false)
     }
-  }, [currentThreadId])
+  }, [currentThreadId, profile])
 
   const stopExecution = useCallback(() => {
     // abort the SSE fetch
