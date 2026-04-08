@@ -123,3 +123,20 @@ export function streamRun(threadId, message, onEvent, extraConfigurable = {}) {
     getAbortController: () => abortController,
   }
 }
+
+export async function seedMemory(profile) {
+  const body = {
+    mbtiType: profile.mbtiType || '',
+    mbtiTitle: profile.mbtiTitle || '',
+    mbtiSubtitle: profile.mbtiSubtitle || '',
+    dimensions: profile.dimensions || {},
+    quickPick: profile.quickPick || {},
+  }
+  const res = await fetch(`${BASE_URL}/api/memory/seed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`seedMemory failed: ${res.status}`)
+  return res.json()
+}
