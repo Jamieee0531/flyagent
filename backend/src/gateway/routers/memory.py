@@ -1,9 +1,12 @@
 """Memory API router for retrieving and managing global memory data."""
 
+import uuid
+from datetime import datetime
+
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from src.agents.memory.updater import get_memory_data, reload_memory_data
+from src.agents.memory.updater import _save_memory_to_file, get_memory_data, reload_memory_data
 from src.config.memory_config import get_memory_config
 
 router = APIRouter(prefix="/api", tags=["memory"])
@@ -199,3 +202,108 @@ async def get_memory_status() -> MemoryStatusResponse:
         ),
         data=MemoryResponse(**memory_data),
     )
+
+
+# ── Onboarding seed ──────────────────────────────────────────────────────────
+
+
+class MbtiProfile(BaseModel):
+    """MBTI quiz result used to seed initial memory facts."""
+
+    mbtiType: str = Field(..., description="Travel personality type key, e.g. 'city_drifter'")
+    mbtiTitle: str = Field(default="", description="Human-readable type name")
+    mbtiSubtitle: str = Field(default="", description="One-line description")
+    dimensions: dict[str, int] = Field(default_factory=dict, description="Five dimension scores 0–100")
+    quickPick: dict[str, str] = Field(default_factory=dict, description="departure/companion/budget/timeWindow")
+
+
+class SeedResponse(BaseModel):
+    seeded: bool
+    facts_added: int
+
+
+@router.post(
+    "/memory/seed",
+    response_model=SeedResponse,
+    summary="Seed Memory from MBTI Profile",
+    description=(
+        "Write initial high-confidence facts into memory.json from the user's quiz result. "
+        "Safe to call multiple times — facts whose content already exists are not re-added."
+    ),
+)
+async def seed_memory_from_profile(profile: MbtiProfile) -> SeedResponse:
+    """Initialise memory.json with facts derived from the onboarding quiz result."""
+    dims = profile.dimensions
+    qp = profile.quickPick
+    dim_str = ", ".join(f"{k.capitalize()} {v}" for k, v in dims.items() if v is not None)
+
+    candidates: list[dict] = []
+
+    if profile.mbtiTitle:
+        candidates.append({
+            "content": (
+                f"User's travel personality is '{profile.mbtiTitle}' ({profile.mbtiType}). "
+                f"Subtitle: {profile.mbtiSubtitle}. "
+                f"Dimension scores — {dim_str}."
+            ),
+            "category": "preference",
+            "confidence": 1.0,
+        })
+
+    if qp.get("departure"):
+        candidates.append({
+            "content": f"User typically travels from {qp['departure']}.",
+            "category": "context",
+            "confidence": 1.0,
+        })
+
+    if qp.get("companion"):
+        candidates.append({
+            "content": f"User's preferred travel companion type: {qp['companion']}.",
+            "category": "preference",
+            "confidence": 0.9,
+        })
+
+    if qp.get("budget"):
+        candidates.append({
+            "content": f"User's stated travel budget: {qp['budget']}.",
+            "category": "preference",
+            "confidence": 0.9,
+        })
+
+    solitude = dims.get("solitude", 50)
+    if solitude >= 70:
+        candidates.append({
+            "content": f"User strongly prefers solo travel (Solitude score {solitude}).",
+            "category": "preference",
+            "confidence": 0.9,
+        })
+    elif solitude <= 30:
+        candidates.append({
+            "content": f"User prefers group or social travel (Solitude score {solitude}).",
+            "category": "preference",
+            "confidence": 0.9,
+        })
+
+    memory = get_memory_data()
+    existing_contents = {f["content"] for f in memory.get("facts", [])}
+    now = datetime.utcnow().isoformat() + "Z"
+
+    added = 0
+    for fact in candidates:
+        if fact["content"] in existing_contents:
+            continue
+        memory.setdefault("facts", []).append({
+            "id": f"fact_{uuid.uuid4().hex[:8]}",
+            "content": fact["content"],
+            "category": fact["category"],
+            "confidence": fact["confidence"],
+            "createdAt": now,
+            "source": "onboarding_quiz",
+        })
+        added += 1
+
+    if added > 0:
+        _save_memory_to_file(memory)
+
+    return SeedResponse(seeded=added > 0, facts_added=added)

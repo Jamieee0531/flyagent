@@ -36,7 +36,7 @@ const SUBAGENT_TO_PANEL_ID = {
   'travel-tips': 'tips',
 }
 
-export function useLanggraph() {
+export function useLanggraph(profile) {
   const [messages, setMessages] = useState(INITIAL_MESSAGES)
   const [agents, setAgents] = useState(buildIdleAgents)
   const [results, setResults] = useState(null)
@@ -93,6 +93,11 @@ export function useLanggraph() {
       // messageChunk has .type, .content, .tool_calls etc.
       if (Array.isArray(data) && data.length >= 1) {
         const msgChunk = data[0]
+        const meta = data[1] || {}
+        // Only render messages from the main agent node — filter out
+        // TitleMiddleware and other middleware LLM calls that leak into the stream
+        const node = meta?.metadata?.langgraph_node
+        if (node && node !== 'agent') return
         handleMessageChunk(msgChunk)
       } else if (data && data.type) {
         handleMessageChunk(data)
@@ -110,8 +115,24 @@ export function useLanggraph() {
   }
 
   function handleMessageChunk(msg) {
-    // skip non-AI messages (human, tool results)
     const msgType = msg.type
+
+    // ask_clarification ToolMessage — display formatted question in chat,
+    // replacing the incomplete intro text the agent may have streamed before calling the tool
+    if (msgType === 'tool' && msg.name === 'ask_clarification') {
+      const content = typeof msg.content === 'string' ? msg.content : ''
+      if (!content) return
+      setMessages((prev) => {
+        // finalize any in-progress streaming bubble, then add clarification as a new bubble
+        const finalized = prev.map((m) =>
+          m.isStreaming ? { ...m, isStreaming: false } : m
+        )
+        return [...finalized, { id: `clarify-${Date.now()}`, role: 'agent', text: content, isStreaming: false }]
+      })
+      return
+    }
+
+    // skip non-AI messages (human, tool results)
     if (msgType !== 'AIMessageChunk' && msgType !== 'ai') return
 
     // skip tool call messages (task dispatch) — don't show in chat
@@ -138,15 +159,15 @@ export function useLanggraph() {
     if (insideThinkingRef.current) {
       if (visibleContent.includes('</thinking>')) {
         insideThinkingRef.current = false
-        // Keep only text AFTER </thinking>
-        visibleContent = visibleContent.split('</thinking>').pop().trim()
+        // Keep only text AFTER </thinking> — no trim, preserve leading newlines
+        visibleContent = visibleContent.split('</thinking>').pop()
       } else {
         return // entirely inside thinking block, suppress
       }
     }
 
-    // Also strip any leftover <thinking> or </thinking> fragments
-    visibleContent = visibleContent.replace(/<\/?thinking>/g, '').trim()
+    // Strip any leftover <thinking> or </thinking> fragments, but preserve whitespace/newlines
+    visibleContent = visibleContent.replace(/<\/?thinking>/g, '')
 
     if (!visibleContent) return
 
@@ -307,7 +328,18 @@ export function useLanggraph() {
       }
 
       // start SSE stream — DO NOT await, let events drive UI in real-time
-      const handle = streamRun(threadId, text, handleSSEEvent)
+      const profileConfigurable = profile
+        ? {
+            profile: {
+              mbtiType: profile.mbtiType,
+              mbtiTitle: profile.mbtiTitle,
+              mbtiSubtitle: profile.mbtiSubtitle,
+              dimensions: profile.dimensions,
+              quickPick: profile.quickPick,
+            },
+          }
+        : {}
+      const handle = streamRun(threadId, text, handleSSEEvent, profileConfigurable)
       streamHandleRef.current = handle
 
       // handle stream completion in background
@@ -343,7 +375,7 @@ export function useLanggraph() {
       ])
       setIsSending(false)
     }
-  }, [currentThreadId])
+  }, [currentThreadId, profile])
 
   const stopExecution = useCallback(() => {
     // abort the SSE fetch

@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { seedMemory } from '../api/langgraph.js';
 import { travelTypes } from '../data/travelTypes.js';
 import { getPersonaSvg, getAnimalSvg } from '../data/avatarSvg.js';
 import './ResultPage.css';
@@ -19,17 +20,22 @@ export default function ResultPage() {
 
   useEffect(() => {
     if (!typeKey || !typeData || saved) return;
-    saveProfile({
+    const profileData = {
       mbtiType: typeKey,
       mbtiTitle: typeData.type,
       mbtiSubtitle: typeData.subtitle,
       dimensions: dims,
-      pet: typeData.pet ? {
-        name: typeData.pet.name,
-        type: typeData.pet.type,
-        traits: typeData.pet.traits,
-      } : undefined,
-    }).then(() => setSaved(true)).catch(() => {});
+      pet: typeData.pet
+        ? { name: typeData.pet.name, type: typeData.pet.type, traits: typeData.pet.traits }
+        : undefined,
+    };
+    saveProfile(profileData)
+      .then(() => {
+        setSaved(true);
+        // Fire-and-forget: seed memory facts from quiz result (non-blocking)
+        seedMemory({ ...profileData, quickPick: {} }).catch(() => {});
+      })
+      .catch(() => {});
   }, [typeKey, typeData, dims, saveProfile, saved]);
 
   if (!typeKey || !typeData) {

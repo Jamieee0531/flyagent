@@ -55,7 +55,7 @@ export async function cancelRun(threadId, runId) {
   if (!res.ok) throw new Error(`cancelRun failed: ${res.status}`)
 }
 
-export function streamRun(threadId, message, onEvent) {
+export function streamRun(threadId, message, onEvent, extraConfigurable = {}) {
   const abortController = new AbortController()
 
   const promise = getAssistantId().then(async (assistantId) => {
@@ -68,6 +68,7 @@ export function streamRun(threadId, message, onEvent) {
         configurable: {
           thread_id: threadId,
           subagent_enabled: true,
+          ...extraConfigurable,
         },
       },
       stream_mode: ['values', 'messages-tuple', 'custom'],
@@ -121,4 +122,21 @@ export function streamRun(threadId, message, onEvent) {
     close: () => abortController.abort(),
     getAbortController: () => abortController,
   }
+}
+
+export async function seedMemory(profile) {
+  const body = {
+    mbtiType: profile.mbtiType || '',
+    mbtiTitle: profile.mbtiTitle || '',
+    mbtiSubtitle: profile.mbtiSubtitle || '',
+    dimensions: profile.dimensions || {},
+    quickPick: profile.quickPick || {},
+  }
+  const res = await fetch(`${BASE_URL}/api/memory/seed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`seedMemory failed: ${res.status}`)
+  return res.json()
 }
