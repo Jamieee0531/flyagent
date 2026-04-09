@@ -32,8 +32,29 @@ const userSchema = new Schema(
 
     /** Optional display information shown in the UI. */
     profile: {
-      displayName: { type: String, trim: true },
-      avatarUrl:   { type: String },
+      displayName:  { type: String, trim: true },
+      avatarUrl:    { type: String },
+      mbtiType:     { type: String },
+      mbtiTitle:    { type: String },
+      mbtiSubtitle: { type: String },
+      dimensions: {
+        escape:   { type: Number, default: 0 },
+        pace:     { type: Number, default: 0 },
+        nature:   { type: Number, default: 0 },
+        solitude: { type: Number, default: 0 },
+        quality:  { type: Number, default: 0 },
+      },
+      pet: {
+        name:   { type: String },
+        type:   { type: String },
+        traits: [{ type: String }],
+      },
+      quickPick: {
+        departure:  { type: String },
+        companion:  { type: String },
+        budget:     { type: String },
+        timeWindow: { type: String },
+      },
     },
 
     /** User preferences that personalise search results and display. */

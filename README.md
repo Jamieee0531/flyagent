@@ -1,6 +1,6 @@
-# Nomie — AI Travel Planning Assistant
+# Nomie — AI Travel Planning Agent
 
-An AI-powered web agent that helps users plan trips. Instead of manually searching across multiple travel websites, users describe their travel needs (destination, dates, number of people, budget) in a chat, and the agent automatically browses travel sites, compares prices, and returns organized results with recommendations.
+An AI-powered travel planning agent that personalizes recommendations based on your travel personality. Users take a 90-second MBTI-style travel quiz, then chat with an AI companion that searches real-time flights, hotels, generates itineraries, and displays results on Google Maps.
 
 **Team**:
 - KANG Jinyu (A0330139M)
@@ -9,177 +9,144 @@ An AI-powered web agent that helps users plan trips. Instead of manually searchi
 
 ---
 
-## Problem Statement
+## Quick Start
 
-Planning a trip usually means opening a bunch of tabs — Google Flights, Trip.com, Booking.com — and manually comparing prices, schedules, and reviews. This process is time-consuming and often leads to suboptimal choices because:
+### Prerequisites
 
-- Users may not check every platform, missing out on cheaper options
-- Comparing across different sites with different layouts is mentally exhausting
-- By the time you finish comparing, prices might have already changed
+- Node.js 18+
+- Python 3.12+
+- Docker Desktop (for MongoDB + Gateway)
+- API Keys (see Environment Variables below)
 
-Nomie aims to solve this by delegating the search and comparison work to AI agents that browse these sites on behalf of the user and return a curated summary. This problem will remain relevant as long as travel booking platforms exist, and is likely to grow in importance as AI agent technology matures over the next 5–10 years.
+### 1. Clone and install
 
-## Solution Architecture
-
-The project follows a three-layer, microservice-style architecture inspired by the DeerFlow 2.0 design pattern, separating the auth/data management plane from the AI agent runtime:
-
-```
-┌────────────────────────┐        ┌──────────────────────────────────┐
-│  Frontend (React+Vite) │        │  LangGraph Server (Python :2024) │
-│  :3000                 │──────► │  DeerFlow-based agent harness    │
-│                        │◄────── │  Flight / Hotel / Itinerary /    │
-│  REST (Auth+Favorites) │  SSE   │  Tips agents + Checkpointer      │
-└──────────┬─────────────┘        └──────────────────────────────────┘
-           │ REST
-           ▼
-┌────────────────────────┐
-│  API Gateway           │
-│  Node.js + Express     │
-│  :8080                 │
-│                        │
-│  POST /api/auth/*      │
-│  GET|POST|DELETE       │
-│    /api/favorites      │
-└──────────┬─────────────┘
-           │
-           ▼
-    MongoDB :27017
-    ├── users
-    └── favorites
+```bash
+git clone https://github.com/IT5007-2520/course-project-project_3.git
+cd course-project-project_3
 ```
 
-- **Frontend**: React + Vite, pixel-art themed UI. Chat interface, real-time agent progress panel, result cards, favorites, and session history sidebar.
-- **API Gateway**: Node.js + Express. Handles user authentication (JWT) and favorites persistence (MongoDB). Fully decoupled from the LangGraph server.
-- **LangGraph Server**: Python-based AI agent harness using DeerFlow architecture. Runs flight/hotel/itinerary/tips agents with long-term session memory via LangGraph Checkpointer.
+### 2. Backend (LangGraph Agent Server)
 
-## Legal / Open Source
+```bash
+cd backend
+pip install uv          # if not installed
+uv sync                 # install Python dependencies
+cp .env.example .env    # then fill in API keys (see below)
+make dev                # starts on http://localhost:2024
+```
 
-This project is open source under the MIT License.
+### 3. Gateway (Auth + Database)
 
-### Borrowed Code / References
+```bash
+# Make sure Docker Desktop is running
+cd docker
+docker-compose up --build -d    # starts MongoDB (:27017) + Gateway (:8080)
+```
 
-- Frontend pixel-art design style inspired by [Star-Office-UI](https://github.com/ringhyacinth/Star-Office-UI)
-- Uses open source libraries: React, React Router, Vite, Bootstrap, Express, Mongoose, LangGraph
+Gateway needs its own `.env` file:
+```bash
+cd gateway
+cp .env.example .env    # then set JWT_SECRET (see below)
+```
 
-No other external code was directly copied into this project.
+### 4. Frontend
 
-## Competition Analysis
+```bash
+cd frontend
+npm install
+cp .env.example .env    # then fill in URLs and API keys (see below)
+npm run dev             # starts on http://localhost:3000
+```
 
-| Product | Type | Pros | Cons |
-|---------|------|------|------|
-| **携程 (Ctrip)** | Traditional OTA | Huge inventory, reliable booking | Manual search, no cross-platform comparison |
-| **Skyscanner** | Meta-search engine | Compares across airlines | Still requires manual browsing, no personalized planning |
-| **Google Flights** | Search tool | Clean UI, good filters | Only flights, no hotels/itinerary bundled |
-| **Gemini Deep Research** | AI general search | Can research any topic in depth | Not travel-specific, no structured comparison output |
+### 5. Open the app
 
-**Nomie's differentiator**: It combines the comparison ability of meta-search engines with AI automation. Users don't need to search manually — they just describe what they want, and the agent does the rest. The output is structured (flights, hotels, itinerary, tips) rather than a generic text response.
+Visit http://localhost:3000. Register an account, take the MBTI quiz, then start chatting!
+
+---
+
+## Environment Variables
+
+### backend/.env
+
+```
+GOOGLE_API_KEY=<Gemini API key>
+OPENAI_API_KEY=<OpenAI API key>
+TAVILY_API_KEY=<Tavily web search key>
+SERPAPI_API_KEY=<SerpApi key for Google Flights/Hotels>
+```
+
+### gateway/.env
+
+```
+PORT=8080
+MONGO_URI=mongodb://localhost:27017/nomie
+JWT_SECRET=<random 64-char hex string>
+JWT_EXPIRES_IN=24h
+CORS_ORIGIN=http://localhost:3000
+NODE_ENV=development
+```
+
+Generate JWT_SECRET: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+
+### frontend/.env
+
+```
+VITE_LANGGRAPH_URL=http://localhost:2024
+VITE_GATEWAY_URL=http://localhost:8080
+VITE_GOOGLE_MAPS_KEY=<Google Maps JavaScript API key>
+```
+
+---
+
+## Architecture
+
+```
+Frontend (:3000)  React + Vite
+    |                    |
+    | REST API           | SSE streaming
+    v                    v
+Gateway (:8080)    LangGraph Server (:2024)
+Express + MongoDB       |
+- Auth (JWT)        Lead Agent (Gemini 2.5 Flash)
+- TravelPlan CRUD       |
+                   +---------+-----------+----------+
+                   |         |           |          |
+              Flight    Hotel      Itinerary    Tips
+              Agent     Agent      Agent        Agent
+              (SerpApi) (SerpApi)  (GPT-4o-mini)(Gemini)
+```
+
+- **Frontend**: React 19, MBTI quiz, Dashboard with Google Maps
+- **Gateway**: Express 5, MongoDB 7, JWT auth, TravelPlan persistence
+- **LangGraph Server**: Python, LangGraph, 4 parallel sub-agents
+- **Gateway and LangGraph do not communicate** — frontend connects to both independently
 
 ---
 
 ## Features
 
-### Frontend (Implemented)
-
-- **Login / Register page** with JavaScript form validation (email format, password length, confirm password)
-- **Chat interface** for users to describe travel needs in natural language
-- **Agent execution panel** — real-time 2x2 grid showing each agent's progress with step-by-step details, status badges, and animations
-- **Result panel** — organized display of flights, hotels, day-by-day itinerary, and travel tips
-- **Favorites system** — save and manage preferred flights/hotels
-- **Session history** — sidebar with past trip sessions
-- **Collapsible sidebar** for flexible layout
-- **Pixel-art themed UI** with custom fonts (Ark Pixel), consistent color scheme, and CSS animations
-- **React Router** for client-side navigation with auth guards
-- **Responsive layout** that adapts when agent/result panels appear
-
-### Backend — API Gateway (Implemented)
-
-- **User Registration** — `POST /api/auth/register` with bcrypt password hashing (salt rounds=12), email uniqueness validation, returns JWT
-- **User Login** — `POST /api/auth/login` with bcrypt.compare, returns JWT; both "not found" and "wrong password" return 401 to prevent email enumeration
-- **Stateless Logout** — `POST /api/auth/logout` (JWT-protected; client discards token)
-- **JWT Authentication Middleware** — Bearer token verification on all protected routes; decoded `{ userId, email }` injected into `req.user`
-- **Rate Limiting** — `express-rate-limit` with stricter limits on auth endpoints (10 req/15 min) to slow brute-force attacks
-- **Favorites — List** — `GET /api/favorites` returns authenticated user's saved cards, sorted newest-first
-- **Favorites — Save** — `POST /api/favorites` stores full result card JSON; deduplication via unique `(userId, cardId)` MongoDB index (returns 409 on duplicate)
-- **Favorites — Delete** — `DELETE /api/favorites/:id` with ownership check (403 Forbidden if user doesn't own the record)
-- **Zod Request Validation** — all POST endpoints validated with Zod schemas; returns `400` with field-level error array on invalid input
-- **Health Check** — `GET /health` liveness probe for Docker healthchecks
-- **Seed Script** — `npm run seed` populates two demo users with sample favorites for evaluation
-
-### Backend — LangGraph Agent Layer (In Progress)
-
-- DeerFlow-inspired multi-agent harness
-- Flight / Hotel / Itinerary / Tips agents
-- LangGraph Checkpointer for session memory
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 20+
-- Docker Desktop (for MongoDB and containerized startup)
-
-### Option A — One-Command Docker Startup
-
-```bash
-# Start MongoDB + API Gateway together
-cd docker
-docker-compose up --build
-
-# Seed the database with demo users (in a new terminal)
-cd gateway
-npm run seed
-```
-
-### Option B — Local Development (MongoDB running separately)
-
-```bash
-# 1. Start MongoDB in Docker
-docker run -d -p 27017:27017 --name nomie-mongo mongo:7
-
-# 2. Configure gateway environment
-cd gateway
-cp .env.example .env
-# Edit .env: set MONGO_URI=mongodb://localhost:27017/nomie and JWT_SECRET
-
-# 3. Install dependencies and start
-npm install
-npm run dev       # starts on :8080 with hot-reload
-
-# 4. Seed demo data (optional)
-npm run seed
-```
-
 ### Frontend
+- MBTI-style travel personality quiz (5 questions, 8 personality types)
+- AI chat with personality-aware suggestions
+- Real-time flight/hotel search results with booking links
+- Day-by-day itinerary with Google Maps integration
+- Travel tips with expandable sections
+- Save/load/delete travel plans (MongoDB persistence)
+- JWT authentication (register/login)
 
-```bash
-cd frontend
-npm install
-npm run dev   # starts on :3000
-```
-
-### Demo Credentials (after seeding)
-
-| Email | Password |
-|-------|----------|
-| `alice@nomie-seed.example` | `Passw0rd!` |
-| `bob@nomie-seed.example`   | `Passw0rd!` |
+### Backend
+- Multi-agent orchestration: 4 sub-agents run in parallel
+- Real-time data: SerpApi Google Flights + Google Hotels
+- Mixed model routing: Gemini 2.5 Flash + GPT-4o-mini
+- SSE streaming for real-time UI updates
+- User profile storage (MBTI type, preferences)
+- TravelPlan CRUD with full itinerary persistence
 
 ---
 
-## Tech Stack
+## Borrowed Code / References
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19 + Vite, JavaScript (JSX), CSS |
-| UI Kit | Bootstrap 5, custom pixel-art fonts (Ark Pixel) |
-| Routing | React Router v7 |
-| API Gateway | Node.js 20, Express 4 |
-| Auth | `bcryptjs` (bcrypt hashing) + `jsonwebtoken` (JWT) |
-| Validation | `zod` (runtime schema validation) |
-| Database | MongoDB 7 via Mongoose 8 |
-| Logging | `morgan` (access log) + `winston` (error log) |
-| Security | `express-rate-limit` (brute-force protection) |
-| AI Agent Layer | Python, LangGraph, DeerFlow architecture |
-| Container | Docker + docker-compose |
+- **DeerFlow** (ByteDance): Base agent framework — LangGraph architecture, middleware system, sub-agent delegation. https://github.com/bytedance/deer-flow
+- **SerpApi**: Google Flights and Google Hotels real-time data
+- **Google Maps JavaScript API**: Itinerary map visualization
+- Open source libraries: React, LangGraph, LangChain, Express, Mongoose, bcryptjs, jsonwebtoken, Zod

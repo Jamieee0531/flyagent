@@ -29,7 +29,9 @@ function Chat({ phase, onStopAgents, compressed, messages, isSending, onSendMess
         {messages.map(msg => (
           <div key={msg.id} className={`message ${msg.role}`}>
             {msg.role === 'agent' && <span className="message-avatar">🤖</span>}
-            <div className="message-bubble">{msg.text}</div>
+            <div className={`message-bubble ${msg.isStreaming ? 'streaming' : ''}`}>
+              {msg.text}
+            </div>
           </div>
         ))}
       </div>

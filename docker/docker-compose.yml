@@ -16,8 +16,6 @@
 #   docker-compose exec api-gateway sh # shell into running gateway
 # ============================================================
 
-version: "3.9"
-
 services:
   # ----------------------------------------------------------
   # MongoDB — primary datastore for users and favorites
@@ -27,7 +25,7 @@ services:
     container_name: nomie-mongo
     restart: unless-stopped
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -47,7 +45,7 @@ services:
     container_name: nomie-api-gateway
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     env_file:
       - ../gateway/.env.docker
     depends_on:

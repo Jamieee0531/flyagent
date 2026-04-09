@@ -1,89 +1,59 @@
-import { useState } from 'react'
-import './LoginPage.css'
+import { useState } from 'react';
+import { useAuth } from '../hooks/useAuth';
+import { useNavigate } from 'react-router-dom';
+import './LoginPage.css';
 
-// login / register page with form validation
-function LoginPage({ onLogin }) {
-  const [isRegister, setIsRegister] = useState(false)
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPw, setConfirmPw] = useState('')
-  const [errors, setErrors] = useState({})
-
-  // validate inputs before submit
-  const validate = () => {
-    const errs = {}
-    if (!email.trim()) {
-      errs.email = 'Email is required'
-    } else if (!/\S+@\S+\.\S+/.test(email)) {
-      errs.email = 'Please enter a valid email'
-    }
-    if (!password) {
-      errs.password = 'Password is required'
-    } else if (password.length < 6) {
-      errs.password = 'Password must be at least 6 characters'
-    }
-    if (isRegister && password !== confirmPw) {
-      errs.confirmPw = 'Passwords do not match'
-    }
-    return errs
-  }
+export default function LoginPage() {
+  const [isRegister, setIsRegister] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const { login, register } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    const errs = validate()
-    setErrors(errs)
-    if (Object.keys(errs).length > 0) return
-
-    setErrors({ _general: 'Connecting...' })
-
-    try {
-      const endpoint = isRegister ? '/api/auth/register' : '/api/auth/login'
-      const response = await fetch(`http://localhost:8080${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        // Handle Zod array errors and basic error string
-        if (data.errors && Array.isArray(data.errors)) {
-          const apiErrs = {}
-          data.errors.forEach(err => {
-            if (err.field) apiErrs[err.field] = err.message
-          })
-          setErrors(apiErrs)
-        } else {
-          setErrors({ email: data.error || 'Authentication failed' })
-        }
-        return
-      }
-
-      // Success
-      localStorage.setItem('nomie_token', data.token)
-      onLogin()
-    } catch (err) {
-      setErrors({ email: 'Failed to connect to server' })
+    e.preventDefault();
+    setError('');
+    if (!email.trim() || !password) {
+      setError('Email and password are required');
+      return;
     }
-  }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      if (isRegister) {
+        await register(email, password, displayName);
+        navigate('/intro');
+      } else {
+        await login(email, password);
+        // useAuth will reload profile; App routing handles redirect
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  // clear errors when switching tabs
-  const switchTab = (register) => {
-    setIsRegister(register)
-    setErrors({})
-    setEmail('')
-    setPassword('')
-    setConfirmPw('')
-  }
+  const switchTab = (reg) => {
+    setIsRegister(reg);
+    setError('');
+  };
 
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-logo">
-          <span className="logo-icon">✈️</span>
-          <h1>Nomie</h1>
-          <p className="login-subtitle">Your AI Travel Companion</p>
+        <div className="login-header">
+          <div className="logo">
+            <span className="logo-mark">N</span>
+            Nomie
+          </div>
+          <p className="login-subtitle">Discover your travel soul</p>
         </div>
 
         <div className="login-tabs">
@@ -101,7 +71,21 @@ function LoginPage({ onLogin }) {
           </button>
         </div>
 
+        {error && <div className="login-error">{error}</div>}
+
         <form onSubmit={handleSubmit} className="login-form" noValidate>
+          {isRegister && (
+            <div className="form-group">
+              <label htmlFor="displayName">Name</label>
+              <input
+                id="displayName"
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Your name"
+              />
+            </div>
+          )}
           <div className="form-group">
             <label htmlFor="email">Email</label>
             <input
@@ -111,7 +95,6 @@ function LoginPage({ onLogin }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="your@email.com"
             />
-            {errors.email && <span className="form-error">{errors.email}</span>}
           </div>
           <div className="form-group">
             <label htmlFor="password">Password</label>
@@ -120,30 +103,15 @@ function LoginPage({ onLogin }) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="8+ characters"
             />
-            {errors.password && <span className="form-error">{errors.password}</span>}
           </div>
-          {isRegister && (
-            <div className="form-group">
-              <label htmlFor="confirmPw">Confirm Password</label>
-              <input
-                id="confirmPw"
-                type="password"
-                value={confirmPw}
-                onChange={(e) => setConfirmPw(e.target.value)}
-                placeholder="••••••••"
-              />
-              {errors.confirmPw && <span className="form-error">{errors.confirmPw}</span>}
-            </div>
-          )}
-          <button type="submit" className="login-submit">
-            {isRegister ? 'Sign Up' : 'Sign In'}
+          <button type="submit" className="btn-primary login-submit" disabled={submitting}>
+            {submitting ? 'Please wait...' : isRegister ? 'Create Account' : 'Sign In'}
+            {!submitting && <span className="arrow">&#8594;</span>}
           </button>
         </form>
       </div>
     </div>
-  )
+  );
 }
-
-export default LoginPage

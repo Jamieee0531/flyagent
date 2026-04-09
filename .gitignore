@@ -35,6 +35,9 @@ IT5007-CourseProject.pdf
 # Reference code
 deer-flow/
 
+# Backend runtime data
+.deer-flow/
+
 # Vite cache
 .vite/
 
@@ -42,3 +45,6 @@ deer-flow/
 architecture_feedback.docx
 tripagent_technical_architecture.docx
 Nomie Architecture Documentation.md
+
+# Internal dev plans
+docs/superpowers/

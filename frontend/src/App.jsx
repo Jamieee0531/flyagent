@@ -1,42 +1,65 @@
-import { useState } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import LoginPage from './pages/LoginPage.jsx'
-import MainPage from './pages/MainPage.jsx'
-import './App.css'
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './hooks/useAuth';
+import LoginPage from './pages/LoginPage';
+import IntroPage from './pages/IntroPage';
+import QuizPage from './pages/QuizPage';
+import ResultPage from './pages/ResultPage';
+import QuickPickPage from './pages/QuickPickPage';
+import DashboardPage from './pages/DashboardPage';
+import DashboardV2 from './pages/DashboardV2';
 
-// top-level app component, handles auth routing
-function App() {
-  // Replace with real auth persistence from localStorage
-  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('nomie_token'))
+function AuthGuard({ children, requireMbti = false }) {
+  const { isAuthenticated, hasCompletedMbti, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (requireMbti && !hasCompletedMbti) return <Navigate to="/intro" replace />;
+  return children;
+}
 
-  const handleLogin = () => setIsLoggedIn(true)
+function AppRoutes() {
+  const { isAuthenticated, hasCompletedMbti, loading } = useAuth();
+  if (loading) return null;
 
-  const handleLogout = () => {
-    localStorage.removeItem('nomie_token')
-    setIsLoggedIn(false)
-  }
-
-  // redirect to /login if not logged in, otherwise show main page
   return (
     <Routes>
       <Route
         path="/login"
         element={
-          isLoggedIn
-            ? <Navigate to="/" replace />
-            : <LoginPage onLogin={handleLogin} />
+          isAuthenticated
+            ? <Navigate to={hasCompletedMbti ? '/dashboard' : '/intro'} replace />
+            : <LoginPage />
         }
       />
+      <Route path="/intro" element={<AuthGuard><IntroPage /></AuthGuard>} />
+      <Route path="/quiz" element={<AuthGuard><QuizPage /></AuthGuard>} />
+      <Route path="/result" element={<AuthGuard><ResultPage /></AuthGuard>} />
+      <Route path="/quickpick" element={<AuthGuard><QuickPickPage /></AuthGuard>} />
       <Route
-        path="/*"
+        path="/dashboard"
+        element={<AuthGuard requireMbti><DashboardPage /></AuthGuard>}
+      />
+      <Route
+        path="/dashboard-v2"
+        element={<AuthGuard requireMbti><DashboardV2 /></AuthGuard>}
+      />
+      <Route
+        path="*"
         element={
-          isLoggedIn
-            ? <MainPage onLogout={handleLogout} />
-            : <Navigate to="/login" replace />
+          <Navigate to={
+            !isAuthenticated ? '/login' :
+            !hasCompletedMbti ? '/intro' :
+            '/dashboard'
+          } replace />
         }
       />
     </Routes>
-  )
+  );
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
+  );
+}
