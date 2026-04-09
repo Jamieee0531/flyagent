@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { getAnimalSvg } from '../../data/avatarSvg.js';
 import './ChatPanel.css';
 
@@ -49,23 +50,18 @@ export default function ChatPanel({ profile, messages, isSending, onSend, onStop
             )}
             <div className={`msg-bubble ${msg.role}`}>
               {msg.role === 'agent'
-                ? msg.isStreaming
-                  ? <span style={{ whiteSpace: 'pre-wrap' }}>{msg.text}▌</span>
-                  : <ReactMarkdown>{msg.text}</ReactMarkdown>
+                ? <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {msg.isStreaming ? msg.text + '▌' : msg.text}
+                  </ReactMarkdown>
                 : <>{msg.text}{msg.isStreaming && <span className="msg-cursor">|</span>}</>}
             </div>
           </div>
         ))}
-        {isSending && messages[messages.length - 1]?.role !== 'agent' && (
-          <div className="chat-msg agent">
-            <div className="msg-avatar agent">
-              <span dangerouslySetInnerHTML={{ __html: animalSvg || '🐾' }} />
-            </div>
-            <div className="typing-dots">
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-              <div className="typing-dot" />
-            </div>
+        {isSending && (
+          <div className="generating-signal">
+            <span className="signal-dot" />
+            <span className="signal-dot" />
+            <span className="signal-dot" />
           </div>
         )}
         <div ref={messagesEndRef} />
