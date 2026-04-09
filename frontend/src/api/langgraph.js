@@ -1,6 +1,6 @@
 // frontend/src/api/langgraph.js
 
-const BASE_URL = import.meta.env.VITE_LANGGRAPH_URL || 'http://localhost:2024'
+const BASE_URL = import.meta.env.VITE_LANGGRAPH_URL || 'http://127.0.0.1:2024'
 
 // cache the assistant_id so we only fetch it once
 let _assistantId = null

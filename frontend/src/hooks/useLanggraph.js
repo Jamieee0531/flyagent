@@ -1,4 +1,17 @@
-// frontend/src/hooks/useLanggraph.js
+/**
+ * @file useLanggraph.js
+ * @description Custom React hook that manages all communication with the
+ * LangGraph agent server (http://localhost:2024).
+ *
+ * Responsibilities:
+ * - Creating and resuming LangGraph threads (one per conversation session)
+ * - Sending user messages and streaming SSE responses back to the UI
+ * - Parsing sub-agent task events to update the agent status panel
+ * - Parsing agent results (flights, hotels, itinerary, tips) from tool messages
+ * - Loading and switching historical sessions via the thread list API
+ *
+ * The hook is instantiated once in DashboardPage and passed down as props.
+ */
 
 import { useCallback, useRef, useState } from 'react'
 import { createThread, searchThreads, getThreadState, streamRun, cancelRun } from '../api/langgraph.js'

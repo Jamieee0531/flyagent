@@ -114,3 +114,50 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ── Field-level validation ── */
+.form-group input.field-error {
+  border-color: var(--accent);
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.field-hint.error {
+  color: var(--accent);
+}
+
+.field-hint.ok {
+  color: var(--sage);
+}
+
+/* ── Password strength bar ── */
+.pwd-hint-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pwd-bar {
+  flex: 1;
+  height: 3px;
+  background: var(--warm2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.pwd-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+/* ── MOBILE (≤ 480px) ── */
+@media (max-width: 480px) {
+  .login-card {
+    width: 100%;
+    padding: 32px 20px;
+  }
+}

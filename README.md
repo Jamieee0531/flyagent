@@ -9,6 +9,36 @@ An AI-powered travel planning agent that personalizes recommendations based on y
 
 ---
 
+## Problem Statement
+
+Planning a trip today means juggling six tabs at once — Google Flights for prices, Booking.com for hotels, TripAdvisor for reviews, Reddit for local advice, YouTube for vlog inspiration, and a spreadsheet to hold it together. It is exhausting, and the results are still generic.
+
+Existing tools search well but do not *understand* the traveler. A solo backpacker has completely different needs from a family of four or a couple on a honeymoon. Budget matters, travel style matters, must-see interests matter — yet every platform serves the same ranked list to everyone.
+
+Nomie addresses this by combining **personality-aware AI** with **real-time multi-source search**:
+1. A 90-second travel personality quiz captures your travel style (adventure vs. comfort, solo vs. group, budget vs. luxury).
+2. A conversational AI companion collects your destination, dates, and preferences through natural chat — no forms to fill.
+3. Four specialized sub-agents search flights, hotels, itineraries, and travel tips **in parallel**, returning real prices and real booking links.
+4. Results are shown as structured cards, not walls of text — flights with airline links, hotels with photos and ratings, a day-by-day map itinerary.
+
+---
+
+## Why Nomie vs. Existing Tools
+
+| | TripAdvisor | Google Travel | Kayak | **Nomie** |
+|---|---|---|---|---|
+| Conversational input | ✗ | ✗ | ✗ | ✅ Chat-based |
+| Personality-aware | ✗ | ✗ | ✗ | ✅ MBTI quiz |
+| Flights + Hotels + Itinerary in one place | Partial | Partial | Partial | ✅ All 4 in one |
+| Real-time parallel search | ✗ | ✓ | ✓ | ✅ 4 agents in parallel |
+| Day-by-day itinerary | ✗ | ✗ | ✗ | ✅ Generated |
+| Map visualization | ✗ | ✓ | ✗ | ✅ Google Maps |
+| Curated plan, not a list | ✗ | ✗ | ✗ | ✅ |
+
+TripAdvisor and Kayak are aggregators — great for comparing prices, but they require the user to know exactly what they want and do all the planning themselves. Google Travel comes closest but remains a search interface with no conversational layer and no itinerary generation. Nomie acts as a **travel planning agent**: it asks the right questions, searches on your behalf, and returns a complete plan ready to act on.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -100,26 +130,66 @@ VITE_GOOGLE_MAPS_KEY=<Google Maps JavaScript API key>
 
 ## Architecture
 
-```
-Frontend (:3000)  React + Vite
-    |                    |
-    | REST API           | SSE streaming
-    v                    v
-Gateway (:8080)    LangGraph Server (:2024)
-Express + MongoDB       |
-- Auth (JWT)        Lead Agent (Gemini 2.5 Flash)
-- TravelPlan CRUD       |
-                   +---------+-----------+----------+
-                   |         |           |          |
-              Flight    Hotel      Itinerary    Tips
-              Agent     Agent      Agent        Agent
-              (SerpApi) (SerpApi)  (GPT-4o-mini)(Gemini)
+```mermaid
+graph TB
+    User(["👤 User"])
+
+    subgraph FE["Frontend — React + Vite  :3000"]
+        Quiz["MBTI Quiz<br/>(personality onboarding)"]
+        Chat["Chat Panel<br/>(SSE streaming)"]
+        Result["Result Panel<br/>(Flights · Hotels · Itinerary · Tips)"]
+        Maps["Google Maps View"]
+    end
+
+    subgraph GW["Gateway — Express + MongoDB  :8080"]
+        Auth["JWT Auth<br/>(register / login)"]
+        DB[("MongoDB<br/>users · travel plans")]
+        CRUD["TravelPlan CRUD<br/>(save · load · delete)"]
+    end
+
+    subgraph BE["LangGraph Server — Python  :2024"]
+        Lead["Lead Agent<br/>Gemini 2.5 Flash<br/>(clarify → plan → dispatch)"]
+        subgraph SUB["4 Sub-agents — run in parallel"]
+            F["✈ Flight Search<br/>SerpApi / Google Flights"]
+            H["🏨 Hotel Search<br/>SerpApi / Google Hotels"]
+            I["🗓 Itinerary Planner<br/>GPT-4o-mini"]
+            T["💡 Travel Tips<br/>Gemini Flash"]
+        end
+    end
+
+    User -->|"browser"| FE
+    FE -->|"REST + JWT"| GW
+    FE -->|"SSE stream"| BE
+    GW --- DB
+    Auth --- DB
+    CRUD --- DB
+    Lead -->|"task() × 4"| SUB
 ```
 
-- **Frontend**: React 19, MBTI quiz, Dashboard with Google Maps
-- **Gateway**: Express 5, MongoDB 7, JWT auth, TravelPlan persistence
-- **LangGraph Server**: Python, LangGraph, 4 parallel sub-agents
-- **Gateway and LangGraph do not communicate** — frontend connects to both independently
+### Component responsibilities
+
+| Component | Tech | Responsibility |
+|---|---|---|
+| Frontend | React 19, Vite | MBTI quiz, chat UI, result cards, Google Maps |
+| Gateway | Express 5, MongoDB 7 | JWT auth, TravelPlan CRUD — no agent logic |
+| LangGraph Server | Python, LangGraph | Lead agent + 4 parallel sub-agents, SSE streaming |
+
+**Key design decision**: Gateway and LangGraph Server never talk to each other. The frontend connects to both independently — REST for auth/persistence, SSE for live agent output. This keeps the agent layer stateless and independently deployable.
+
+### Data flow for a typical search
+
+```
+User types "I want to go to Tokyo next month"
+  → Lead Agent (clarify): asks for dates, origin, traveler count
+  → User confirms: "Start searching!"
+  → Lead Agent dispatches 4 task() calls simultaneously
+      ├─ flight-search  → SerpApi Google Flights  → FlightCard[]
+      ├─ hotel-search   → SerpApi Google Hotels   → HotelCard[]
+      ├─ itinerary      → GPT-4o-mini             → ItineraryDay[]
+      └─ travel-tips    → Gemini Flash            → TipsSection[]
+  → Each result streams back via SSE as cards appear in the Result Panel
+  → User saves plan → Gateway writes to MongoDB
+```
 
 ---
 

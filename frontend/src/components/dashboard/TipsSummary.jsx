@@ -1,11 +1,23 @@
 import { useState } from 'react';
+import './TipsSummary.css';
+
+const CATEGORY_ICONS = {
+  visa: '🛂', weather: '🌤', transport: '🚇', currency: '💱',
+  connectivity: '📶', safety: '🛡', food: '🍜', culture: '🏛',
+  health: '🏥', accommodation: '🏨', shopping: '🛍', tips: '💡',
+};
+
+function getCategoryIcon(label) {
+  if (!label) return '💡';
+  const key = label.toLowerCase().split(/[\s_/]/)[0];
+  return CATEGORY_ICONS[key] || '💡';
+}
 
 export default function TipsSummary({ tips }) {
   const [expanded, setExpanded] = useState({});
 
   if (!tips) return null;
 
-  // Normalize tips data — agent returns { categories: [{ category, tips: [] }] }
   let sections = [];
   if (Array.isArray(tips)) {
     sections = tips.map((s) => ({
@@ -24,32 +36,23 @@ export default function TipsSummary({ tips }) {
     }));
   }
 
-  const toggle = (i) => {
-    setExpanded((prev) => ({ ...prev, [i]: !prev[i] }));
-  };
+  const toggle = (i) => setExpanded((prev) => ({ ...prev, [i]: !prev[i] }));
 
   return (
     <div className="result-section">
       <span className="rs-label">Travel Tips</span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div className="tips-list">
         {sections.map((s, i) => {
           const isOpen = expanded[i] ?? false;
           return (
-            <div key={i} style={{
-              padding: '12px 14px',
-              background: 'var(--warm)',
-              borderRadius: '12px',
-              cursor: 'pointer',
-            }}>
-              <div
-                onClick={() => toggle(i)}
-                style={{ fontSize: '10px', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '6px' }}
-              >
-                <span style={{ fontSize: '12px' }}>{isOpen ? '\u25BE' : '\u25B8'}</span>
-                {s.label || s.category || ''}
+            <div key={i} className="tips-item" onClick={() => toggle(i)}>
+              <div className="tips-header">
+                <span>{getCategoryIcon(s.label)}</span>
+                <span className="tips-label">{s.label}</span>
+                <span className={`tips-chevron ${isOpen ? 'open' : ''}`}>▸</span>
               </div>
               {isOpen && (
-                <div style={{ fontSize: '13px', lineHeight: '1.7', color: 'var(--ink)', marginTop: '6px', whiteSpace: 'pre-line' }}>
+                <div className="tips-body">
                   {s.text ? `• ${s.text}` : ''}
                 </div>
               )}

@@ -1,3 +1,15 @@
+/**
+ * @file ChatPanel.jsx
+ * @description Chat UI component — renders the conversation thread between the
+ * user and the Nomie AI companion, and provides the message input.
+ *
+ * Props:
+ *   profile   {object}   - User's MBTI profile; used for avatar and companion name.
+ *   messages  {Array}    - Array of { id, role, text, isStreaming } message objects.
+ *   isSending {boolean}  - True while the agent is generating a response.
+ *   onSend    {Function} - Called with the trimmed message string when the user submits.
+ *   onStop    {Function} - Called when the user clicks the Stop button mid-stream.
+ */
 import { useCallback, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';

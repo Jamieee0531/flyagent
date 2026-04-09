@@ -1,4 +1,4 @@
-const BASE = import.meta.env.VITE_GATEWAY_URL || 'http://localhost:8080';
+const BASE = import.meta.env.VITE_GATEWAY_URL || '';
 
 async function request(path, { token, method = 'GET', body } = {}) {
   const headers = { 'Content-Type': 'application/json' };
