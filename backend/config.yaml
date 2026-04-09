@@ -6,12 +6,21 @@
 # ============================================================================
 
 models:
-  - name: deepseek
-    display_name: DeepSeek Chat
+  # Default model (Lead Agent + flight-search + hotel-search)
+  - name: gemini
+    display_name: Gemini 2.5 Flash
+    use: langchain_google_genai:ChatGoogleGenerativeAI
+    model: gemini-2.5-flash
+    api_key: $GOOGLE_API_KEY
+    max_tokens: 4096
+    temperature: 0.7
+
+  # For itinerary-planner
+  - name: gpt-4o-mini
+    display_name: GPT-4o Mini
     use: langchain_openai:ChatOpenAI
-    model: deepseek-chat
-    api_key: $DEEPSEEK_API_KEY
-    base_url: https://api.deepseek.com/v1
+    model: gpt-4o-mini
+    api_key: $OPENAI_API_KEY
     max_tokens: 4096
     temperature: 0.7
 
