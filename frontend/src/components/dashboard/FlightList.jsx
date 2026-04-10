@@ -1,3 +1,14 @@
+/**
+ * @file FlightList.jsx
+ * @description Renders a list of flight result cards returned by the flight-search sub-agent.
+ *
+ * Props:
+ *   flights  {Array}    - Flight objects from the agent (SerpApi Google Flights schema).
+ *   selected {object}   - Currently selected flight (used for visual highlight).
+ *   onSelect {Function} - Called with the flight object when the user clicks a card or "Select".
+ *
+ * Falls back to Google Flights search URL if no booking_url is present on a flight.
+ */
 import './FlightList.css';
 
 function getFlightBookingUrl(f) {

@@ -1,3 +1,14 @@
+/**
+ * @file ItineraryDay.jsx
+ * @description Renders one day's itinerary as a vertical timeline of stops.
+ * Each stop can be viewed, edited inline, or deleted. New stops can be appended.
+ *
+ * Props:
+ *   day      {object}   - A day object: { day: number, theme: string, stops: Stop[] }
+ *                         where Stop = { time, name, description, transport, category, emoji }.
+ *   onUpdate {Function} - Called with the updated day object when stops are modified.
+ *                         The parent (ResultTabs) merges this back into the itinerary array.
+ */
 import { useState } from 'react';
 import './ItineraryDay.css';
 

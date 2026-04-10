@@ -64,7 +64,7 @@ export default function QuizPage() {
         <span className="progress-label">{questionNum} / {total}</span>
       </div>
 
-      <div className="quiz-screen">
+      <div className="quiz-screen" key={questionNum}>
         <span className="q-label">{node.choices?.[0]?.axis?.toUpperCase() || ''}</span>
         <h2 className="q-text">{node.question}</h2>
 

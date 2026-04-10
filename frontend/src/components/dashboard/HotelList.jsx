@@ -1,3 +1,14 @@
+/**
+ * @file HotelList.jsx
+ * @description Renders a list of hotel result cards returned by the hotel-search sub-agent.
+ *
+ * Props:
+ *   hotels   {Array}    - Hotel objects from the agent (SerpApi Google Hotels schema).
+ *   selected {object}   - Currently selected hotel (used for visual highlight).
+ *   onSelect {Function} - Called with the hotel object when the user clicks a card or "Select".
+ *
+ * Shares FlightList.css for the result-card shell styles.
+ */
 import './FlightList.css'; // reuse result card styles
 
 function getHotelBookingUrl(h) {
