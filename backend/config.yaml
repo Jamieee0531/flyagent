@@ -83,7 +83,11 @@ skills:
 # ============================================================================
 
 title:
-  enabled: true
+  enabled: false  # disabled: TitleMiddleware's aafter_model LLM call streams
+                  # into the same SSE channel as the main agent response, causing
+                  # the generated title (e.g. "Warm May Food Trip") to leak into
+                  # the chat as a separate bubble. Filtering by langgraph_node
+                  # doesn't work because middleware runs inside the 'agent' node.
   max_words: 6
   max_chars: 60
   model_name: null
