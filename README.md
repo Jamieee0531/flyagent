@@ -15,6 +15,14 @@ An AI-powered travel planning agent that personalizes recommendations based on y
   <img src="docs/STePs%20Poster.png" alt="Nomie STePS Poster" width="640">
 </p>
 
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=-vhlqGCD7mY">
+    <img src="https://img.youtube.com/vi/-vhlqGCD7mY/maxresdefault.jpg" alt="▶ Watch the Nomie Demo" width="640">
+  </a>
+  <br>
+  <em>▶ Click to watch the 2:30 demo on YouTube</em>
+</p>
+
 ---
 
 ## Problem Statement
