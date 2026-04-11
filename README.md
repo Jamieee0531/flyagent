@@ -7,6 +7,10 @@ An AI-powered travel planning agent that personalizes recommendations based on y
 - LI Jingwen (A0328022R)
 - LI Zouran (A0329022N)
 
+<p align="center">
+  <img src="docs/STePs%20Poster.png" alt="Nomie STePS Poster" width="640">
+</p>
+
 ---
 
 ## Problem Statement
