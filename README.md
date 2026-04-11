@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.jpg" alt="Nomie" width="480">
+</p>
+
 # Nomie — AI Travel Planning Agent
 
 An AI-powered travel planning agent that personalizes recommendations based on your travel personality. Users take a 90-second MBTI-style travel quiz, then chat with an AI companion that searches real-time flights, hotels, generates itineraries, and displays results on Google Maps.
