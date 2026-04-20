@@ -62,6 +62,15 @@ const userSchema = new Schema(
       currency: { type: String, default: 'USD' },
       language: { type: String, default: 'en' },
     },
+
+    /** Google Calendar OAuth tokens (null until user connects calendar). */
+    googleCalendar: {
+      accessToken:  { type: String },
+      refreshToken: { type: String },
+      tokenExpiry:  { type: Date },
+      calendarId:   { type: String, default: 'primary' },
+      connectedAt:  { type: Date },
+    },
   },
   {
     timestamps: true, // adds createdAt and updatedAt automatically

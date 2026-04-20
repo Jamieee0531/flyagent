@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import ProactiveAlert from './components/Notifications/ProactiveAlert';
 import LoginPage from './pages/LoginPage';
 import IntroPage from './pages/IntroPage';
 import QuizPage from './pages/QuizPage';
@@ -60,6 +61,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppRoutes />
+      <ProactiveAlert />
     </AuthProvider>
   );
 }

@@ -24,6 +24,10 @@ export default function ResultTabs({
   const [tips, setTips] = useState(null);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
+  const [calendarAdding, setCalendarAdding] = useState(false);
+  const [calendarMsg, setCalendarMsg] = useState('');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tripStartDate, setTripStartDate] = useState('');
 
   // Sync AI agent results into local display state
   useEffect(() => {
@@ -53,6 +57,28 @@ export default function ResultTabs({
     { id: 'overview', label: 'Overview' },
     ...itinerary.map((d) => ({ id: `day-${d.day}`, label: `Day ${d.day}` })),
   ];
+
+  const handleAddToCalendar = async () => {
+    if (!tripStartDate || itinerary.length === 0) return;
+    setCalendarAdding(true);
+    setCalendarMsg('');
+    try {
+      const FASTAPI = import.meta.env.VITE_GATEWAY_WS_URL?.replace('ws://', 'http://') || 'http://localhost:8001';
+      const destination = profile?.quickPick?.departure || 'Trip';
+      const res = await fetch(`${FASTAPI}/api/calendar/add-trip`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, itinerary, start_date: tripStartDate, destination }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || 'Failed');
+      setCalendarMsg(`✓ ${data.created} day(s) added to Google Calendar`);
+      setShowDatePicker(false);
+    } catch (err) {
+      setCalendarMsg(`Failed: ${err.message}`);
+    }
+    setCalendarAdding(false);
+  };
 
   const handleSavePlan = async () => {
     if (!selectedFlight && !selectedHotel && itinerary.length === 0) return;
@@ -147,23 +173,48 @@ export default function ResultTabs({
 
       {!isViewingSavedPlan && (selectedFlight || selectedHotel || itinerary.length > 0) && (
         <div className="save-plan-bar">
-          <button
-            className="btn-primary save-plan-btn"
-            onClick={handleSavePlan}
-            disabled={saving}
-          >
+          <button className="btn-primary save-plan-btn" onClick={handleSavePlan} disabled={saving}>
             {saving ? 'Saving...' : 'Save Plan'}
           </button>
-          {saveMsg && (
-            <span
-              className="save-msg"
-              style={{
-                marginLeft: '12px',
-                fontSize: '13px',
-                color: saveMsg.startsWith('Failed') ? '#c4593a' : '#4a6b5a',
-              }}
+
+          {itinerary.length > 0 && !showDatePicker && (
+            <button
+              className="btn-ghost save-plan-btn"
+              style={{ marginLeft: 8 }}
+              onClick={() => setShowDatePicker(true)}
             >
-              {saveMsg}
+              📅 Add to Calendar
+            </button>
+          )}
+
+          {showDatePicker && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 8 }}>
+              <input
+                type="date"
+                value={tripStartDate}
+                onChange={(e) => setTripStartDate(e.target.value)}
+                style={{ fontSize: 13, padding: '2px 6px', borderRadius: 6, border: '1px solid #ccc' }}
+              />
+              <button
+                className="btn-primary save-plan-btn"
+                onClick={handleAddToCalendar}
+                disabled={calendarAdding || !tripStartDate}
+                style={{ padding: '4px 12px' }}
+              >
+                {calendarAdding ? 'Adding...' : 'Confirm'}
+              </button>
+              <button className="btn-ghost" onClick={() => setShowDatePicker(false)} style={{ fontSize: 13 }}>
+                Cancel
+              </button>
+            </span>
+          )}
+
+          {(saveMsg || calendarMsg) && (
+            <span className="save-msg" style={{
+              marginLeft: 12, fontSize: 13,
+              color: (saveMsg || calendarMsg).startsWith('Failed') ? '#c4593a' : '#4a6b5a',
+            }}>
+              {calendarMsg || saveMsg}
             </span>
           )}
         </div>

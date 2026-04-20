@@ -55,3 +55,15 @@ export function updateTravelPlan(token, id, data) {
 export function deleteTravelPlan(token, id) {
   return request(`/api/travel-plans/${id}`, { token, method: 'DELETE' });
 }
+
+export function getCalendarStatus(token) {
+  return request('/api/calendar/status', { token });
+}
+
+export function disconnectCalendar(token) {
+  return request('/api/calendar/disconnect', { token, method: 'DELETE' });
+}
+
+export function connectCalendarUrl(token) {
+  return `${BASE}/api/calendar/connect?token=${encodeURIComponent(token)}`;
+}

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -9,6 +10,7 @@ from src.gateway.config import get_gateway_config
 from src.gateway.routers import (
     agents,
     artifacts,
+    calendar_write,
     channels,
     mcp,
     memory,
@@ -16,6 +18,7 @@ from src.gateway.routers import (
     skills,
     suggestions,
     uploads,
+    websocket,
 )
 
 # Configure logging
@@ -57,7 +60,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.exception("No IM channels configured or channel service failed to start")
 
+    # Start Google Calendar polling loop
+    from src.scheduler.poller import polling_loop
+
+    poller_task = asyncio.create_task(polling_loop())
+    logger.info("Calendar poller started (interval: 12 h)")
+
     yield
+
+    # Stop poller
+    poller_task.cancel()
+    try:
+        await poller_task
+    except asyncio.CancelledError:
+        pass
 
     # Stop channel service on shutdown
     try:
@@ -175,6 +191,12 @@ This gateway provides custom endpoints for models, MCP configuration, skills, an
 
     # Channels API is mounted at /api/channels
     app.include_router(channels.router)
+
+    # WebSocket for real-time push notifications
+    app.include_router(websocket.router)
+
+    # Calendar write — add trip events to Google Calendar
+    app.include_router(calendar_write.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict:

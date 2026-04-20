@@ -38,6 +38,7 @@ const { generalLimiter } = require('./middlewares/rateLimit.middleware');
 const authRoutes       = require('./routes/auth.routes');
 const profileRoutes    = require('./routes/profile.routes');
 const travelPlanRoutes = require('./routes/travelPlan.routes');
+const calendarRoutes   = require('./routes/calendar.routes');
 
 const app  = express();
 const PORT = process.env.PORT || 8080;
@@ -93,6 +94,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth',         authRoutes);
 app.use('/api/user/profile', profileRoutes);
 app.use('/api/travel-plans', travelPlanRoutes);
+app.use('/api/calendar',     calendarRoutes);
 
 // ---------------------------------------------------------------------------
 // 404 handler

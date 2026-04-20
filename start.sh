@@ -35,7 +35,7 @@ step() { echo -e "\n${CYAN}▶ $*${RESET}"; }
 PIDS=()
 cleanup() {
   echo ""
-  log "Shutting down frontend and LangGraph..."
+  log "Shutting down frontend, LangGraph and FastAPI gateway..."
   for pid in "${PIDS[@]:-}"; do
     kill "$pid" 2>/dev/null || true
   done
@@ -119,8 +119,31 @@ until (echo > /dev/tcp/localhost/2024) 2>/dev/null; do
 done
 ok "LangGraph Server ready  →  http://localhost:2024  (log: .langgraph.log)"
 
-# ── 3. Frontend ───────────────────────────────────────────────────────────────
+# ── 3. FastAPI Notification Gateway ──────────────────────────────────────────
+step "Starting FastAPI Notification Gateway (WebSocket + Calendar Poller)"
+LOG_API="$ROOT/.fastapi.log"
+(cd "$ROOT/backend" && uv run uvicorn src.gateway.app:app \
+  --host 0.0.0.0 --port 8001 --reload \
+  > "$LOG_API" 2>&1) &
+PIDS+=($!)
+
+log "Waiting for FastAPI gateway on port 8001..."
+RETRIES=20
+until curl -sf http://localhost:8001/health &>/dev/null; do
+  RETRIES=$((RETRIES - 1))
+  if [[ $RETRIES -le 0 ]]; then
+    warn "FastAPI gateway may still be loading. Check: tail -f .fastapi.log"
+    break
+  fi
+  sleep 2
+done
+ok "FastAPI Gateway ready  →  http://localhost:8001  (log: .fastapi.log)"
+
+# ── 4. Frontend ───────────────────────────────────────────────────────────────
 step "Starting Frontend"
+log "Installing frontend dependencies..."
+(cd "$ROOT/frontend" && npm install --silent)
+ok "Frontend dependencies ready"
 (cd "$ROOT/frontend" && npm run dev) &
 PIDS+=($!)
 sleep 2
@@ -129,10 +152,11 @@ sleep 2
 echo ""
 echo -e "${BOLD}${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "${BOLD}  Nomie is running!${RESET}"
-echo -e "  Frontend   →  ${CYAN}http://localhost:3000${RESET}"
-echo -e "  Gateway    →  ${CYAN}http://localhost:8080${RESET}"
-echo -e "  LangGraph  →  ${CYAN}http://localhost:2024${RESET}"
+echo -e "  Frontend      →  ${CYAN}http://localhost:3000${RESET}"
+echo -e "  Gateway       →  ${CYAN}http://localhost:8080${RESET}"
+echo -e "  LangGraph     →  ${CYAN}http://localhost:2024${RESET}"
+echo -e "  Notif Gateway →  ${CYAN}http://localhost:8001${RESET}  (WS + Calendar poller)"
 echo -e "${BOLD}${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "  ${BOLD}Ctrl+C${RESET} to stop frontend + LangGraph\n"
+echo -e "  ${BOLD}Ctrl+C${RESET} to stop all foreground services\n"
 
 wait
