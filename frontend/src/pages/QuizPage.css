@@ -1,0 +1,126 @@
+/* ── Progress ── */
+.progress-wrap {
+  margin: 32px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.progress-track {
+  flex: 1;
+  height: 2px;
+  background: var(--warm);
+  border-radius: 1px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 1px;
+  transition: width .6s cubic-bezier(.16,1,.3,1);
+}
+.progress-label {
+  font-size: 11px;
+  color: var(--muted);
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Quiz Screen ── */
+.quiz-screen {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 32px 0 48px;
+  animation: fadeUp .5s cubic-bezier(.16,1,.3,1);
+}
+.quiz-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.q-label {
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.q-text {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.25;
+  margin-bottom: 28px;
+  letter-spacing: -.3px;
+}
+
+/* ── Choice Cards ── */
+.choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.choice-card {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  aspect-ratio: 3/4;
+  transition: transform .25s cubic-bezier(.16,1,.3,1);
+  border: 1.5px solid transparent;
+}
+.choice-card:hover { transform: scale(1.02); }
+.choice-card.selected { border-color: var(--accent); }
+
+.choice-scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.choice-scene svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.choice-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(14,14,12,.75) 0%, rgba(14,14,12,.1) 50%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+  transition: background .2s;
+}
+.choice-card:hover .choice-overlay {
+  background: linear-gradient(to top, rgba(14,14,12,.85) 0%, rgba(14,14,12,.2) 50%, transparent 100%);
+}
+
+.choice-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 20px;
+  font-weight: 400;
+  color: white;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.choice-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.choice-tag {
+  font-size: 9px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.18);
+  color: rgba(255,255,255,.85);
+  backdrop-filter: blur(4px);
+  letter-spacing: .3px;
+}
