@@ -11,7 +11,7 @@ except ImportError:
     TIKTOKEN_AVAILABLE = False
 
 # Prompt template for updating memory based on conversation
-MEMORY_UPDATE_PROMPT = """You are a memory management system. Your task is to analyze a conversation and update the user's memory profile.
+MEMORY_UPDATE_PROMPT = """You are a memory management system for Nomie, an AI travel planning assistant. Your task is to analyze a conversation and update the user's long-term travel preference profile.
 
 Current Memory State:
 <current_memory>
@@ -23,97 +23,56 @@ New Conversation to Process:
 {conversation}
 </conversation>
 
-Instructions:
-1. Analyze the conversation for important information about the user
-2. Extract relevant facts, preferences, and context with specific details (numbers, names, technologies)
-3. Update the memory sections as needed following the detailed length guidelines below
+## What TO store (cross-trip preferences that apply to every future trip)
 
-Memory Section Guidelines:
+**travelProfile** — stable preferences that rarely change:
+- homeCity: User's home city / usual departure point (e.g. "Shanghai (PVG)")
+- flightPreference: Seat class, direct vs. connecting, preferred airlines, layover tolerance
+- accommodationStyle: Hotel star rating, boutique vs. chain, location priority (city center / near transit)
+- travelStyle: Pace (packed vs. relaxed), interests (history, food, nature, nightlife), solo/couple/family
+- budgetRange: General per-trip budget range (e.g. "economy, 5000–10000 CNY per trip")
+- dietaryNeeds: Vegetarian, halal, allergies, etc.
+- mobilityNeeds: Accessibility requirements, physical limitations
+- personalContext: Languages spoken, MBTI if mentioned, communication style
 
-**User Context** (Current state - concise summaries):
-- workContext: Professional role, company, key projects, main technologies (2-3 sentences)
-  Example: Core contributor, project names with metrics (16k+ stars), technical stack
-- personalContext: Languages, communication preferences, key interests (1-2 sentences)
-  Example: Bilingual capabilities, specific interest areas, expertise domains
-- topOfMind: Multiple ongoing focus areas and priorities (3-5 sentences, detailed paragraph)
-  Example: Primary project work, parallel technical investigations, ongoing learning/tracking
-  Include: Active implementation work, troubleshooting issues, market/research interests
-  Note: This captures SEVERAL concurrent focus areas, not just one task
+**Facts** — specific reusable facts:
+- preference: Things user likes/dislikes about travel (e.g. "prefers window seat", "avoids red-eye flights")
+- behavior: Booking habits, planning horizon (e.g. "books 2–3 months in advance")
+- context: Stable background (home city, passport nationality, frequent flyer status)
+- goal: Bucket list destinations, recurring travel goals
 
-**History** (Temporal context - rich paragraphs):
-- recentMonths: Detailed summary of recent activities (4-6 sentences or 1-2 paragraphs)
-  Timeline: Last 1-3 months of interactions
-  Include: Technologies explored, projects worked on, problems solved, interests demonstrated
-- earlierContext: Important historical patterns (3-5 sentences or 1 paragraph)
-  Timeline: 3-12 months ago
-  Include: Past projects, learning journeys, established patterns
-- longTermBackground: Persistent background and foundational context (2-4 sentences)
-  Timeline: Overall/foundational information
-  Include: Core expertise, longstanding interests, fundamental working style
+## What NOT to store (trip-specific, ephemeral — already saved in thread checkpoints)
 
-**Facts Extraction**:
-- Extract specific, quantifiable details (e.g., "16k+ GitHub stars", "200+ datasets")
-- Include proper nouns (company names, project names, technology names)
-- Preserve technical terminology and version numbers
-- Categories:
-  * preference: Tools, styles, approaches user prefers/dislikes
-  * knowledge: Specific expertise, technologies mastered, domain knowledge
-  * context: Background facts (job title, projects, locations, languages)
-  * behavior: Working patterns, communication habits, problem-solving approaches
-  * goal: Stated objectives, learning targets, project ambitions
-- Confidence levels:
-  * 0.9-1.0: Explicitly stated facts ("I work on X", "My role is Y")
-  * 0.7-0.8: Strongly implied from actions/discussions
-  * 0.5-0.6: Inferred patterns (use sparingly, only for clear patterns)
+NEVER store any of the following in memory:
+- Specific destination for a current trip (e.g. "planning to visit Chiang Mai")
+- Specific travel dates or departure dates (e.g. "departing May 1st")
+- Specific flight or hotel options discussed (e.g. "considering MU5003")
+- Current trip budget quoted in conversation (only store general budget range if explicitly stated as a habit)
+- Itinerary details, day-by-day plans, or activity bookings
+- Anything the user said "this time" or "for this trip"
 
-**What Goes Where**:
-- workContext: Current job, active projects, primary tech stack
-- personalContext: Languages, personality, interests outside direct work tasks
-- topOfMind: Multiple ongoing priorities and focus areas user cares about recently (gets updated most frequently)
-  Should capture 3-5 concurrent themes: main work, side explorations, learning/tracking interests
-- recentMonths: Detailed account of recent technical explorations and work
-- earlierContext: Patterns from slightly older interactions still relevant
-- longTermBackground: Unchanging foundational facts about the user
+If the conversation is purely about planning a specific trip with no new preference signals, output shouldUpdate=false for all sections and an empty newFacts array.
 
-**Multilingual Content**:
-- Preserve original language for proper nouns and company names
-- Keep technical terms in their original form (DeepSeek, LangGraph, etc.)
-- Note language capabilities in personalContext
+## Output Format (JSON)
 
-Output Format (JSON):
 {{
   "user": {{
-    "workContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "personalContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "topOfMind": {{ "summary": "...", "shouldUpdate": true/false }}
-  }},
-  "history": {{
-    "recentMonths": {{ "summary": "...", "shouldUpdate": true/false }},
-    "earlierContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "longTermBackground": {{ "summary": "...", "shouldUpdate": true/false }}
+    "travelProfile": {{ "summary": "...", "shouldUpdate": true/false }},
+    "personalContext": {{ "summary": "...", "shouldUpdate": true/false }}
   }},
   "newFacts": [
-    {{ "content": "...", "category": "preference|knowledge|context|behavior|goal", "confidence": 0.0-1.0 }}
+    {{ "content": "...", "category": "preference|behavior|context|goal", "confidence": 0.0-1.0 }}
   ],
   "factsToRemove": ["fact_id_1", "fact_id_2"]
 }}
 
-Important Rules:
-- Only set shouldUpdate=true if there's meaningful new information
-- Follow length guidelines: workContext/personalContext are concise (1-3 sentences), topOfMind and history sections are detailed (paragraphs)
-- Include specific metrics, version numbers, and proper nouns in facts
-- Only add facts that are clearly stated (0.9+) or strongly implied (0.7+)
-- Remove facts that are contradicted by new information
-- When updating topOfMind, integrate new focus areas while removing completed/abandoned ones
-  Keep 3-5 concurrent focus themes that are still active and relevant
-- For history sections, integrate new information chronologically into appropriate time period
-- Preserve technical accuracy - keep exact names of technologies, companies, projects
-- Focus on information useful for future interactions and personalization
-- IMPORTANT: Do NOT record file upload events in memory. Uploaded files are
-  session-specific and ephemeral — they will not be accessible in future sessions.
-  Recording upload events causes confusion in subsequent conversations.
+## Rules
 
-Return ONLY valid JSON, no explanation or markdown."""
+- Only set shouldUpdate=true when there is genuinely new cross-trip preference information
+- Confidence: 0.9+ for explicitly stated facts, 0.7–0.8 for strongly implied, skip anything below 0.7
+- Remove facts contradicted by new information (e.g. user corrects their home city)
+- Do NOT record file upload events — they are session-specific and ephemeral
+- Return ONLY valid JSON, no explanation or markdown"""
 
 
 # Prompt template for extracting facts from a single message
@@ -186,36 +145,16 @@ def format_memory_for_injection(memory_data: dict[str, Any], max_tokens: int = 2
     if user_data:
         user_sections = []
 
-        work_ctx = user_data.get("workContext", {})
-        if work_ctx.get("summary"):
-            user_sections.append(f"Work: {work_ctx['summary']}")
+        travel_profile = user_data.get("travelProfile", {})
+        if travel_profile.get("summary"):
+            user_sections.append(f"Travel Preferences: {travel_profile['summary']}")
 
         personal_ctx = user_data.get("personalContext", {})
         if personal_ctx.get("summary"):
             user_sections.append(f"Personal: {personal_ctx['summary']}")
 
-        top_of_mind = user_data.get("topOfMind", {})
-        if top_of_mind.get("summary"):
-            user_sections.append(f"Current Focus: {top_of_mind['summary']}")
-
         if user_sections:
-            sections.append("User Context:\n" + "\n".join(f"- {s}" for s in user_sections))
-
-    # Format history
-    history_data = memory_data.get("history", {})
-    if history_data:
-        history_sections = []
-
-        recent = history_data.get("recentMonths", {})
-        if recent.get("summary"):
-            history_sections.append(f"Recent: {recent['summary']}")
-
-        earlier = history_data.get("earlierContext", {})
-        if earlier.get("summary"):
-            history_sections.append(f"Earlier: {earlier['summary']}")
-
-        if history_sections:
-            sections.append("History:\n" + "\n".join(f"- {s}" for s in history_sections))
+            sections.append("User Profile:\n" + "\n".join(f"- {s}" for s in user_sections))
 
     if not sections:
         return ""

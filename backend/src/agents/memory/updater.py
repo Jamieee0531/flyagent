@@ -40,17 +40,11 @@ def _get_memory_file_path(agent_name: str | None = None) -> Path:
 def _create_empty_memory() -> dict[str, Any]:
     """Create an empty memory structure."""
     return {
-        "version": "1.0",
+        "version": "2.0",
         "lastUpdated": datetime.utcnow().isoformat() + "Z",
         "user": {
-            "workContext": {"summary": "", "updatedAt": ""},
+            "travelProfile": {"summary": "", "updatedAt": ""},
             "personalContext": {"summary": "", "updatedAt": ""},
-            "topOfMind": {"summary": "", "updatedAt": ""},
-        },
-        "history": {
-            "recentMonths": {"summary": "", "updatedAt": ""},
-            "earlierContext": {"summary": "", "updatedAt": ""},
-            "longTermBackground": {"summary": "", "updatedAt": ""},
         },
         "facts": [],
     }
@@ -319,20 +313,12 @@ class MemoryUpdater:
 
         # Update user sections
         user_updates = update_data.get("user", {})
-        for section in ["workContext", "personalContext", "topOfMind"]:
+        for section in ["travelProfile", "personalContext"]:
             section_data = user_updates.get(section, {})
             if section_data.get("shouldUpdate") and section_data.get("summary"):
+                if "user" not in current_memory:
+                    current_memory["user"] = {}
                 current_memory["user"][section] = {
-                    "summary": section_data["summary"],
-                    "updatedAt": now,
-                }
-
-        # Update history sections
-        history_updates = update_data.get("history", {})
-        for section in ["recentMonths", "earlierContext", "longTermBackground"]:
-            section_data = history_updates.get(section, {})
-            if section_data.get("shouldUpdate") and section_data.get("summary"):
-                current_memory["history"][section] = {
                     "summary": section_data["summary"],
                     "updatedAt": now,
                 }
