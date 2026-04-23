@@ -20,23 +20,14 @@ class ContextSection(BaseModel):
 
 
 class UserContext(BaseModel):
-    """Model for user context."""
+    """User travel preferences (v2.0 schema)."""
 
-    workContext: ContextSection = Field(default_factory=ContextSection)
+    travelProfile: ContextSection = Field(default_factory=ContextSection)
     personalContext: ContextSection = Field(default_factory=ContextSection)
-    topOfMind: ContextSection = Field(default_factory=ContextSection)
-
-
-class HistoryContext(BaseModel):
-    """Model for history context."""
-
-    recentMonths: ContextSection = Field(default_factory=ContextSection)
-    earlierContext: ContextSection = Field(default_factory=ContextSection)
-    longTermBackground: ContextSection = Field(default_factory=ContextSection)
 
 
 class Fact(BaseModel):
-    """Model for a memory fact."""
+    """A single extracted memory fact."""
 
     id: str = Field(..., description="Unique identifier for the fact")
     content: str = Field(..., description="Fact content")
@@ -47,12 +38,11 @@ class Fact(BaseModel):
 
 
 class MemoryResponse(BaseModel):
-    """Response model for memory data."""
+    """Memory data response (v2.0 travel-specific schema)."""
 
-    version: str = Field(default="1.0", description="Memory schema version")
+    version: str = Field(default="2.0", description="Memory schema version")
     lastUpdated: str = Field(default="", description="Last update timestamp")
     user: UserContext = Field(default_factory=UserContext)
-    history: HistoryContext = Field(default_factory=HistoryContext)
     facts: list[Fact] = Field(default_factory=list)
 
 

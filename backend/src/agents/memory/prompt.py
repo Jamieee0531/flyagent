@@ -156,6 +156,13 @@ def format_memory_for_injection(memory_data: dict[str, Any], max_tokens: int = 2
         if user_sections:
             sections.append("User Profile:\n" + "\n".join(f"- {s}" for s in user_sections))
 
+    # Format preference facts
+    facts = memory_data.get("facts", [])
+    if facts:
+        fact_lines = [f"- {f['content']}" for f in facts if f.get("content")]
+        if fact_lines:
+            sections.append("Travel Preferences (facts):\n" + "\n".join(fact_lines))
+
     if not sections:
         return ""
 

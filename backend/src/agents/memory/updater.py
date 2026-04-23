@@ -107,14 +107,52 @@ def reload_memory_data(agent_name: str | None = None) -> dict[str, Any]:
     return memory_data
 
 
+def _migrate_v1_to_v2(data: dict[str, Any]) -> dict[str, Any]:
+    """Migrate a v1.0 memory file (DeerFlow generic schema) to v2.0 (travel schema).
+
+    v1.0 had workContext / topOfMind / history sections full of trip-specific
+    ephemeral data that polluted the system prompt. v2.0 keeps only stable
+    cross-trip preferences under travelProfile and personalContext.
+
+    Migration strategy:
+    - Preserve personalContext summary if present (language, MBTI — still relevant).
+    - Drop workContext, topOfMind, history entirely (trip-specific noise).
+    - Preserve facts that are clearly preference/context, drop trip-specific ones.
+    """
+    trip_specific_keywords = (
+        "finalized", "departure on", "return on", "trip duration",
+        "flight search", "booking phase", "execution phase", "planning phase",
+        "confirmed destination", "specified", "reconfirmed", "awaiting",
+        "authorized", "proceed", "next action", "immediate priority",
+    )
+
+    old_user = data.get("user", {})
+    personal_ctx = old_user.get("personalContext", {})
+
+    clean_facts = [
+        f for f in data.get("facts", [])
+        if not any(kw in f.get("content", "").lower() for kw in trip_specific_keywords)
+    ]
+
+    return {
+        "version": "2.0",
+        "lastUpdated": data.get("lastUpdated", ""),
+        "user": {
+            "travelProfile": {"summary": "", "updatedAt": ""},
+            "personalContext": personal_ctx if personal_ctx.get("summary") else {"summary": "", "updatedAt": ""},
+        },
+        "facts": clean_facts,
+    }
+
+
 def _load_memory_from_file(agent_name: str | None = None) -> dict[str, Any]:
-    """Load memory data from file.
+    """Load memory data from file, migrating v1.0 → v2.0 if needed.
 
     Args:
         agent_name: If provided, loads per-agent memory file. If None, loads global.
 
     Returns:
-        The memory data dictionary.
+        The memory data dictionary (always v2.0 schema).
     """
     file_path = _get_memory_file_path(agent_name)
 
@@ -124,6 +162,10 @@ def _load_memory_from_file(agent_name: str | None = None) -> dict[str, Any]:
     try:
         with open(file_path, encoding="utf-8") as f:
             data = json.load(f)
+        if data.get("version", "1.0") != "2.0":
+            print(f"Migrating memory file {file_path} from v1.0 to v2.0")
+            data = _migrate_v1_to_v2(data)
+            _save_memory_to_file(data, agent_name)
         return data
     except (json.JSONDecodeError, OSError) as e:
         print(f"Failed to load memory file: {e}")
@@ -150,8 +192,8 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
     Uploaded files are session-scoped; persisting upload events in long-term
     memory causes the agent to search for non-existent files in future sessions.
     """
-    # Scrub summaries in user/history sections
-    for section in ("user", "history"):
+    # Scrub summaries in user section (v2.0 has no history section)
+    for section in ("user",):
         section_data = memory_data.get(section, {})
         for _key, val in section_data.items():
             if isinstance(val, dict) and "summary" in val:
@@ -311,8 +353,8 @@ class MemoryUpdater:
         config = get_memory_config()
         now = datetime.utcnow().isoformat() + "Z"
 
-        # Update user sections
-        user_updates = update_data.get("user", {})
+        # Update user sections (guard against LLM returning user: null)
+        user_updates = update_data.get("user") or {}
         for section in ["travelProfile", "personalContext"]:
             section_data = user_updates.get(section, {})
             if section_data.get("shouldUpdate") and section_data.get("summary"):
